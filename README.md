@@ -1,29 +1,31 @@
-# LA-Lab · Prototipo v0.1
+# LA-Lab v0.2
+Laboratorio Virtual de Analítica del Aprendizaje.
 
-Laboratorio virtual de analítica del aprendizaje, gratuito para usuarios y desarrollado con Python y Streamlit.
+**Autor académico:** Dr. Derlis Hernández Lara. Línea de investigación: Tecnologías Inteligentes para la Transformación Digital de los Ecosistemas Educativos.
 
-## Ejecutar localmente
+## Publicación en Streamlit Community Cloud
+1. Sustituye `app.py`, `requirements.txt` y agrega `.streamlit/config.toml` en la raíz del repositorio GitHub.
+2. La aplicación conectada a la rama `main` se actualizará al detectar el commit.
+3. Para ejecutar localmente: `pip install -r requirements.txt` y `streamlit run app.py`.
 
-```bash
-python -m venv .venv
-# Activar entorno virtual según el sistema operativo
-pip install -r requirements.txt
-streamlit run app.py
-```
+## Casos y procedencia
+Los **14 casos integrados son datos sintéticos**, creados mediante generación reproducible para practicar técnicas y preguntas de Learning Analytics. **No son 14 bases reales descargadas de la literatura.** Se eligió esta estrategia para asegurar disponibilidad, ligereza y ausencia de datos personales en el despliegue público. Los repositorios abiertos verificados se enlazan en la aplicación para futuras incorporaciones con sus licencias y documentación.
 
-## Publicar en internet
+Fuentes abiertas para ampliación:
+- Open University Learning Analytics Dataset: https://doi.org/10.24432/C5KK69 (CC BY 4.0)
+- Student Performance: https://doi.org/10.24432/C5TG7T (CC BY 4.0)
+- Predict Students' Dropout and Academic Success: https://archive.ics.uci.edu/dataset/697/predict+students+dropout+and+academic+success (ver condiciones de reutilización)
 
-1. Crear un repositorio público en GitHub con `app.py` y `requirements.txt`.
-2. Acceder a https://share.streamlit.io/ y vincular el repositorio.
-3. Elegir `app.py` como archivo principal y desplegar.
-4. Compartir la URL pública que proporcione el servicio.
+## Identidad institucional
+La cabecera muestra el nombre de UNAM y CUAED. Para añadir **los emblemas oficiales**, colocar los archivos institucionales autorizados en:
+- `assets/unam.png`
+- `assets/cuaed.png`
 
-El alojamiento gratuito tiene límites de recursos y disponibilidad; no garantiza escalabilidad ilimitada.
+No se incluyen emblemas reconstruidos o no verificados. Su incorporación debe respetar los lineamientos de identidad y evitar sugerir aval institucional distinto de la adscripción académica.
 
-## Privacidad
-
-No subir datos personales identificables ni información académica confidencial. Los datos de demostración son sintéticos. Los archivos se procesan en la sesión de Streamlit y no se guardan deliberadamente en disco; esto no sustituye una evaluación de seguridad del servicio de alojamiento.
-
-## Alcance
-
-Incluye exploración, limpieza básica, indicadores descriptivos, gráficos e interpretación. Los módulos de predicción, ejercicios completos y reportes avanzados están previstos para siguientes versiones.
+## Limitaciones
+- No hay almacenamiento permanente ni cuentas; los resultados se descargan por sesión.
+- No cargar datos personales identificables o sensibles.
+- El servicio gratuito no garantiza 50 usuarios concurrentes; realizar pruebas de carga.
+- La interpretación es estadística basada en reglas, no una IA generativa.
+- No sustituye revisión metodológica, validación de indicadores o juicio pedagógico.
