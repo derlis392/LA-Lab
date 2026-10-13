@@ -1,4 +1,4 @@
-"""LA-Lab v0.3 — Laboratorio abierto de Analítica del Aprendizaje."""
+"""LA-Lab v0.4 — Laboratorio abierto de Analítica del Aprendizaje."""
 import io
 import json
 from pathlib import Path
@@ -126,7 +126,7 @@ h1,h2,h3 {letter-spacing:-.02em}
 
 with st.sidebar:
     st.title('🎓 LA-Lab')
-    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.3')
+    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.4')
     mode = st.radio('Modalidad', ['Casos guiados','Datos propios'],key='mode')
     idx = None
     if mode == 'Casos guiados':
@@ -240,14 +240,14 @@ elif page=='2. Limpieza':
                     cleaned[c]=cleaned[c].fillna(value)
         st.session_state.cleaned=cleaned
         st.session_state.last_cleaning=f'Filas antes: {before}; después: {len(cleaned)}. Duplicados: {remove}. Faltantes: {missing}.'
-        st.success(st.session_state.last_cleaning)
+        st.success(st.session_state.get('last_cleaning','Sin operaciones registradas'))
         st.rerun()
     if st.button('Restablecer datos originales'):
         st.session_state.cleaned=None
         st.session_state.last_cleaning='Datos originales restablecidos.'
         st.rerun()
     st.download_button('Descargar tabla actual (CSV)',csv_bytes(df),'la_lab_datos_limpios.csv','text/csv')
-    text_box(f'El conjunto actual tiene **{len(df)} filas**, **{int(df.isna().sum().sum())} valores faltantes** y **{int(df.duplicated().sum())} duplicados completos**. {st.session_state.last_cleaning} Antes de imputar, revisa si los datos faltan sistemáticamente; la imputación puede alterar la distribución.')
+    text_box(f'El conjunto actual tiene **{len(df)} filas**, **{int(df.isna().sum().sum())} valores faltantes** y **{int(df.duplicated().sum())} duplicados completos**. {st.session_state.get("last_cleaning","Sin operaciones registradas")} Antes de imputar, revisa si los datos faltan sistemáticamente; la imputación puede alterar la distribución.')
 elif page=='3. Indicadores':
     st.header('3. Estadística e indicadores')
     numeric=df.select_dtypes(include='number').columns.tolist()
@@ -317,92 +317,226 @@ elif page=='6. Informe':
     st.header('6. Informe descargable')
     st.write('Síntesis reproducible de la base actual. Las conclusiones automáticas son descriptivas y deben revisarse antes de su uso académico.')
     st.info(interpret_dataset(df))
-    report=f'''LA-LAB v0.3 | INFORME EXPLORATORIO\nCaso: {title}\nProcedencia: {"Conjunto real: "+description if mode=="Casos guiados" else "Archivo aportado por el usuario"}\nRegistros: {len(df)}\nVariables: {len(df.columns)}\nFaltantes: {int(df.isna().sum().sum())}\nDuplicados completos: {int(df.duplicated().sum())}\nLimpieza: {st.session_state.last_cleaning}\nGráfico: {st.session_state.get('plot_summary','No evaluado')}\nMinería de datos: {st.session_state.get('ml_summary','No evaluado')}\n\nVARIABLES:\n{', '.join(map(str,df.columns))}\n\nESTADÍSTICAS NUMÉRICAS:\n{df.describe().to_string() if len(df.select_dtypes(include="number").columns) else "No hay variables numéricas"}\n\nNOTAS:\nLas asociaciones no implican causalidad. Los indicadores requieren validación contextual.\n'''
+    report=f'''LA-LAB v0.4 | INFORME EXPLORATORIO\nCaso: {title}\nProcedencia: {"Conjunto real: "+description if mode=="Casos guiados" else "Archivo aportado por el usuario"}\nRegistros: {len(df)}\nVariables: {len(df.columns)}\nFaltantes: {int(df.isna().sum().sum())}\nDuplicados completos: {int(df.duplicated().sum())}\nLimpieza: {st.session_state.get('last_cleaning','Sin operaciones registradas')}\nGráfico: {st.session_state.get('plot_summary','No evaluado')}\nMinería de datos: {st.session_state.get('ml_summary','No evaluado')}\n\nVARIABLES:\n{', '.join(map(str,df.columns))}\n\nESTADÍSTICAS NUMÉRICAS:\n{df.describe().to_string() if len(df.select_dtypes(include="number").columns) else "No hay variables numéricas"}\n\nNOTAS:\nLas asociaciones no implican causalidad. Los indicadores requieren validación contextual.\n'''
     st.download_button('Descargar informe (.txt)',report.encode('utf-8'),'informe_la_lab.txt','text/plain')
     st.download_button('Descargar datos actuales (.csv)',csv_bytes(df),'datos_la_lab.csv','text/csv')
-    st.download_button('Descargar informe integrado (.txt)',report.encode('utf-8'),'informe_integrado_la_lab.txt','text/plain')
+    # PDF textual reproducible; no reproduce figuras interactivas de Plotly.
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.enums import TA_LEFT
+    from reportlab.lib import colors
+    from xml.sax.saxutils import escape
+    from datetime import datetime
+    pdf_buffer=io.BytesIO()
+    pdf_doc=SimpleDocTemplate(pdf_buffer,pagesize=(595,842),leftMargin=48,rightMargin=48,topMargin=48,bottomMargin=48)
+    styles=getSampleStyleSheet(); story=[Paragraph('LA-Lab v0.4 | Informe de analitica del aprendizaje',styles['Title']),Spacer(1,16)]
+    sections=[('Caso',title),('Fuente',description if mode=='Casos guiados' else 'Datos aportados por el usuario'),
+              ('Registros',str(len(df))),('Variables',str(len(df.columns))),
+              ('Faltantes',str(int(df.isna().sum().sum()))),('Duplicados',str(int(df.duplicated().sum()))),
+              ('Limpieza',str(st.session_state.get('last_cleaning','Sin operaciones registradas'))),
+              ('Visualizacion',str(st.session_state.get('plot_summary','No ejecutada'))),
+              ('Mineria de datos',str(st.session_state.get('ml_summary','No ejecutada')))]
+    if mode=='Casos guiados':
+        sections.extend([('Datos originales',source['url']),('Articulo asociado',source['article']),('Enlace articulo',source['article_url'])])
+    for heading,content in sections:
+        story.append(Paragraph('<b>'+escape(heading)+'</b>: '+escape(content),styles['BodyText']));story.append(Spacer(1,8))
+    story.append(Paragraph('<b>Limitaciones</b>: Asociacion no implica causalidad. Las metricas no acreditan validacion externa. Los datos educativos requieren proteccion y contextualizacion.',styles['BodyText']))
+    pdf_doc.build(story)
+    st.download_button('Descargar informe academico (.pdf)',pdf_buffer.getvalue(),'informe_la_lab_v04.pdf','application/pdf')
+    excel_buffer=io.BytesIO()
+    with pd.ExcelWriter(excel_buffer,engine='openpyxl') as writer:
+        df.head(5000).to_excel(writer,sheet_name='Datos',index=False)
+        pd.DataFrame([{'Campo':k,'Valor':v} for k,v in sections]).to_excel(writer,sheet_name='Resumen',index=False)
+        if len(df.select_dtypes(include='number').columns): df.describe().to_excel(writer,sheet_name='Estadisticas')
+    st.download_button('Descargar libro de analisis (.xlsx)',excel_buffer.getvalue(),'analisis_la_lab_v04.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
     text_box('El informe contiene el resumen de la base, los procedimientos de limpieza y las estadísticas numéricas. No constituye una evaluación individual ni una recomendación automática sobre estudiantes.')
 
 
 elif page=='7. Minería de datos':
     st.header('7. Minería de datos y aprendizaje automático')
-    st.write('Exploración reproducible para enseñanza. No utilizar modelos para decisiones automatizadas sobre estudiantes.')
-    from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
+    st.caption('Experimentos exploratorios. No usar para decisiones automatizadas sobre estudiantes.')
+    from sklearn.model_selection import train_test_split, cross_validate, KFold, StratifiedKFold
     from sklearn.compose import ColumnTransformer
     from sklearn.pipeline import Pipeline
     from sklearn.impute import SimpleImputer
     from sklearn.preprocessing import OneHotEncoder, StandardScaler
     from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge
+    from sklearn.dummy import DummyRegressor, DummyClassifier
     from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier
     from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
     from sklearn.svm import SVC
     from sklearn.neighbors import KNeighborsClassifier
     from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
-    from sklearn.metrics import accuracy_score, f1_score, balanced_accuracy_score, confusion_matrix, mean_absolute_error, mean_squared_error, r2_score, silhouette_score
+    from sklearn.decomposition import PCA
+    from sklearn.metrics import (accuracy_score, f1_score, balanced_accuracy_score, confusion_matrix,
+                                 classification_report, mean_absolute_error, mean_squared_error,
+                                 r2_score, silhouette_score)
+    import plotly.graph_objects as go
+    st.markdown('**Guía rápida:** clasificación predice categorías; regresión predice cantidades; agrupamiento busca similitudes sin etiquetas.')
     kind=st.selectbox('Tipo de tarea',['Clasificación','Regresión','Agrupamiento'])
     options=list(df.columns)
+    numeric_options=df.select_dtypes(include='number').columns.tolist()
     if kind!='Agrupamiento':
         target=st.selectbox('Variable objetivo',options,index=options.index(suggested_target) if suggested_target in options else len(options)-1)
-        predictors=st.multiselect('Variables predictoras',[c for c in options if c!=target],default=[c for c in options if c!=target][:min(12,len(options)-1)])
+        candidates=[c for c in options if c!=target]
+        recommended=[c for c in ['studytime','failures','absences','Medu','Fedu'] if c in candidates]
+        defaults=recommended if recommended else candidates[:min(6,len(candidates))]
+        predictors=st.multiselect('Variables predictoras',candidates,default=defaults,max_selections=12)
     else:
         target=None
-        predictors=st.multiselect('Variables para agrupar',options,default=df.select_dtypes(include='number').columns.tolist()[:8])
-    choices={'Clasificación':['Regresión logística','Árbol de decisión','Random Forest','SVM','KNN','Gradient Boosting'], 'Regresión':['Regresión lineal','Ridge','Árbol de regresión','Random Forest'], 'Agrupamiento':['K-Means','Jerárquico','DBSCAN']}
+        recommended=[c for c in ['studytime','failures','absences','Medu','Fedu'] if c in options]
+        predictors=st.multiselect('Variables para agrupar',options,default=recommended if recommended else numeric_options[:5],max_selections=12)
+    choices={'Clasificación':['Regresión logística','Árbol de decisión','Random Forest','SVM','KNN','Gradient Boosting'],
+             'Regresión':['Regresión lineal','Ridge','Árbol de regresión','Random Forest'],
+             'Agrupamiento':['K-Means','Jerárquico','DBSCAN']}
     algorithm=st.selectbox('Algoritmo',choices[kind])
+    explanations={'Regresión logística':'Clasificador lineal probabilístico; puede utilizar ponderación de clases.',
+                  'Random Forest':'Conjunto de árboles; capta relaciones no lineales, pero requiere comprobar generalización.',
+                  'K-Means':'Agrupa por distancia a centroides. Requiere escalamiento y seleccionar k.',
+                  'Jerárquico':'Construye grupos por proximidad; sensible a la distancia y al escalamiento.',
+                  'DBSCAN':'Identifica regiones densas y posibles observaciones de ruido (-1).',
+                  'Regresión lineal':'Modelo lineal interpretable; examina supuestos y residuos.'}
+    st.caption(explanations.get(algorithm,'Compara este algoritmo con un modelo de referencia y revisa las métricas por grupo.'))
     seed=st.number_input('Semilla aleatoria',0,100000,42)
-    if kind!='Agrupamiento': test_pct=st.slider('Porcentaje de prueba',15,40,25,5)
-    else: clusters=st.slider('Número de grupos (si aplica)',2,8,3)
-    st.caption('Se aplica imputación y codificación dentro del pipeline. Se limita a 12 predictores recomendados y hasta 5 000 filas para proteger el servidor gratuito.')
+    if kind!='Agrupamiento':
+        test_pct=st.slider('Porcentaje de prueba',15,40,20,5)
+        compare=st.checkbox('Comparar todos los algoritmos de esta tarea (misma partición)',value=False)
+        cv=st.checkbox('Validación cruzada en entrenamiento (3 particiones)',value=False)
+        balanced=st.checkbox('Ponderar clases cuando sea posible',value=False) if kind=='Clasificación' else False
+    else:
+        clusters=st.slider('Número de grupos (si aplica)',2,8,3)
+        compare=st.checkbox('Comparar silhouette para varios valores de k (K-Means)',value=False)
+    st.caption('Preprocesamiento dentro del pipeline en tareas supervisadas. Límite de 5 000 registros y 12 predictores para proteger el servidor.')
     if st.button('Ejecutar análisis',type='primary'):
         try:
-            if not predictors: raise ValueError('Selecciona al menos una variable predictora.')
+            if not predictors: raise ValueError('Selecciona al menos una variable.')
             work=df[predictors+([target] if target else [])].copy()
             if target: work=work.dropna(subset=[target])
             if len(work)>5000: work=work.sample(5000,random_state=int(seed))
-            if len(work)<20: raise ValueError('Se necesitan al menos 20 registros válidos.')
+            if len(work)<20: raise ValueError('Se necesitan al menos 20 observaciones válidas.')
             X=work[predictors].copy()
             for c in X.columns:
                 if pd.api.types.is_datetime64_any_dtype(X[c]): X[c]=X[c].astype(str)
             nums=X.select_dtypes(include='number').columns.tolist()
             cats=[c for c in predictors if c not in nums]
-            transformers=[]
-            if nums: transformers.append(('num',Pipeline([('imp',SimpleImputer(strategy='median')),('scale',StandardScaler())]),nums))
-            if cats: transformers.append(('cat',Pipeline([('imp',SimpleImputer(strategy='most_frequent')),('onehot',OneHotEncoder(handle_unknown='ignore',sparse_output=False))]),cats))
-            pre=ColumnTransformer(transformers)
+            transforms=[]
+            if nums: transforms.append(('num',Pipeline([('imp',SimpleImputer(strategy='median')),('scale',StandardScaler())]),nums))
+            if cats: transforms.append(('cat',Pipeline([('imp',SimpleImputer(strategy='most_frequent')),('onehot',OneHotEncoder(handle_unknown='ignore',sparse_output=False))]),cats))
+            pre=ColumnTransformer(transforms)
             if kind=='Clasificación':
                 y=work[target].astype(str)
-                if y.nunique()<2 or y.nunique()>30: raise ValueError('La clasificación requiere entre 2 y 30 categorías en la variable objetivo.')
-                models={'Regresión logística':LogisticRegression(max_iter=500),'Árbol de decisión':DecisionTreeClassifier(max_depth=6,random_state=int(seed)),'Random Forest':RandomForestClassifier(n_estimators=80,max_depth=10,random_state=int(seed),n_jobs=1),'SVM':SVC(),'KNN':KNeighborsClassifier(),'Gradient Boosting':GradientBoostingClassifier(random_state=int(seed))}
-                model=models[algorithm]
-                strat=y if y.value_counts().min()>=2 else None
-                Xtr,Xte,ytr,yte=train_test_split(X,y,test_size=test_pct/100,random_state=int(seed),stratify=strat)
-                pipe=Pipeline([('prep',pre),('model',model)]);pipe.fit(Xtr,ytr);pred=pipe.predict(Xte)
-                result=f'Clasificación {algorithm}: n prueba={len(yte)}, accuracy={accuracy_score(yte,pred):.3f}, balanced accuracy={balanced_accuracy_score(yte,pred):.3f}, F1 macro={f1_score(yte,pred,average="macro",zero_division=0):.3f}.'
-                st.dataframe(pd.DataFrame(confusion_matrix(yte,pred,labels=pipe.classes_),index=pipe.classes_,columns=pipe.classes_))
-                st.write('Distribución de clases de prueba:',yte.value_counts().to_dict())
+                if not 2<=y.nunique()<=30: raise ValueError('La clasificación requiere entre 2 y 30 categorías. Una calificación numérica con muchos valores corresponde a regresión.')
+                models={'Regresión logística':LogisticRegression(max_iter=1000,class_weight='balanced' if balanced else None),
+                        'Árbol de decisión':DecisionTreeClassifier(max_depth=6,class_weight='balanced' if balanced else None,random_state=int(seed)),
+                        'Random Forest':RandomForestClassifier(n_estimators=80,max_depth=10,class_weight='balanced' if balanced else None,random_state=int(seed),n_jobs=1),
+                        'SVM':SVC(class_weight='balanced' if balanced else None),
+                        'KNN':KNeighborsClassifier(),
+                        'Gradient Boosting':GradientBoostingClassifier(random_state=int(seed))}
+                counts_all=y.value_counts()
+                if counts_all.min()<2: raise ValueError('Cada clase necesita al menos dos observaciones para particionar.')
+                Xtr,Xte,ytr,yte=train_test_split(X,y,test_size=test_pct/100,random_state=int(seed),stratify=y)
+                pipe=Pipeline([('prep',pre),('model',models[algorithm])]);pipe.fit(Xtr,ytr);pred=pipe.predict(Xte)
+                labels=sorted(y.unique())
+                cm=confusion_matrix(yte,pred,labels=labels)
+                acc=accuracy_score(yte,pred); bacc=balanced_accuracy_score(yte,pred); f1=f1_score(yte,pred,average='macro',zero_division=0)
+                baseline=DummyClassifier(strategy='most_frequent').fit(Xtr,ytr)
+                baseline_acc=accuracy_score(yte,baseline.predict(Xte))
+                result=f'Clasificación {algorithm}: n prueba={len(yte)}, accuracy={acc:.3f}, balanced accuracy={bacc:.3f}, F1 macro={f1:.3f}; baseline accuracy={baseline_acc:.3f}.'
+                if yte.value_counts(normalize=True).max()>.75: st.warning('Clases desbalanceadas: consulta recall por clase y balanced accuracy; accuracy puede ser engañosa.')
+                st.subheader('Matriz de confusión')
+                fig=px.imshow(cm,x=labels,y=labels,text_auto=True,labels={'x':'Predicción','y':'Clase real','color':'Casos'},color_continuous_scale='Blues',aspect='auto')
+                st.plotly_chart(fig,use_container_width=True)
+                report=pd.DataFrame(classification_report(yte,pred,labels=labels,output_dict=True,zero_division=0)).T
+                st.subheader('Desempeño por clase')
+                st.dataframe(report.loc[labels,['precision','recall','f1-score','support']].round(3),use_container_width=True)
+                st.plotly_chart(px.bar(report.loc[labels].reset_index(names='Clase'),x='Clase',y=['precision','recall','f1-score'],barmode='group',title='Métricas por clase'),use_container_width=True)
+                st.caption(f'Baseline mayoritario: accuracy={baseline_acc:.3f}. Un resultado superior al baseline no implica validez para decisiones individuales.')
+                if compare:
+                    rows=[]
+                    for name,mdl in models.items():
+                        p2=Pipeline([('prep',pre),('model',mdl)]).fit(Xtr,ytr).predict(Xte)
+                        rows.append({'Algoritmo':name,'Accuracy':accuracy_score(yte,p2),'Balanced accuracy':balanced_accuracy_score(yte,p2),'F1 macro':f1_score(yte,p2,average='macro',zero_division=0)})
+                    st.subheader('Comparación exploratoria de modelos');st.dataframe(pd.DataFrame(rows).round(3),hide_index=True)
+                if cv:
+                    folds=min(3,int(ytr.value_counts().min()))
+                    if folds>=2:
+                        cvres=cross_validate(Pipeline([('prep',pre),('model',models[algorithm])]),Xtr,ytr,cv=StratifiedKFold(n_splits=folds,shuffle=True,random_state=int(seed)),scoring='f1_macro')
+                        st.caption(f'CV en entrenamiento, F1 macro: {cvres["test_score"].mean():.3f} ± {cvres["test_score"].std():.3f}')
+                    else: st.warning('No hay suficientes casos por clase para validación cruzada.')
             elif kind=='Regresión':
-                y=pd.to_numeric(work[target],errors='coerce')
-                mask=y.notna();X=X.loc[mask];y=y.loc[mask]
-                if len(y)<20: raise ValueError('La regresión requiere una variable objetivo numérica con al menos 20 valores.')
-                models={'Regresión lineal':LinearRegression(),'Ridge':Ridge(),'Árbol de regresión':DecisionTreeRegressor(max_depth=6,random_state=int(seed)),'Random Forest':RandomForestRegressor(n_estimators=80,max_depth=10,random_state=int(seed),n_jobs=1)}
+                y=pd.to_numeric(work[target],errors='coerce'); mask=y.notna();X=X.loc[mask];y=y.loc[mask]
+                if len(y)<20: raise ValueError('La regresión requiere al menos 20 valores numéricos.')
+                models={'Regresión lineal':LinearRegression(),'Ridge':Ridge(),
+                        'Árbol de regresión':DecisionTreeRegressor(max_depth=6,random_state=int(seed)),
+                        'Random Forest':RandomForestRegressor(n_estimators=80,max_depth=10,random_state=int(seed),n_jobs=1)}
                 Xtr,Xte,ytr,yte=train_test_split(X,y,test_size=test_pct/100,random_state=int(seed))
                 pipe=Pipeline([('prep',pre),('model',models[algorithm])]);pipe.fit(Xtr,ytr);pred=pipe.predict(Xte)
-                result=f'Regresión {algorithm}: n prueba={len(yte)}, MAE={mean_absolute_error(yte,pred):.3f}, RMSE={np.sqrt(mean_squared_error(yte,pred)):.3f}, R²={r2_score(yte,pred):.3f}.'
-                st.plotly_chart(px.scatter(x=yte,y=pred,labels={'x':'Real','y':'Predicho'}),use_container_width=True)
+                mae=mean_absolute_error(yte,pred);rmse=np.sqrt(mean_squared_error(yte,pred));r2=r2_score(yte,pred)
+                base=DummyRegressor(strategy='mean').fit(Xtr,ytr);base_mae=mean_absolute_error(yte,base.predict(Xte))
+                result=f'Regresión {algorithm}: n prueba={len(yte)}, MAE={mae:.3f}, RMSE={rmse:.3f}, R²={r2:.3f}; baseline MAE={base_mae:.3f}.'
+                st.subheader('Calificaciones reales y predichas')
+                fig=px.scatter(x=yte.to_numpy(),y=pred,labels={'x':'Valor real','y':'Valor predicho'},title='Predicción frente a realidad')
+                low=float(min(np.min(yte),np.min(pred)));high=float(max(np.max(yte),np.max(pred)))
+                fig.add_trace(go.Scatter(x=[low,high],y=[low,high],mode='lines',name='Predicción ideal',line={'dash':'dash'}))
+                st.plotly_chart(fig,use_container_width=True)
+                residuals=yte.to_numpy()-pred
+                st.plotly_chart(px.scatter(x=pred,y=residuals,labels={'x':'Valor predicho','y':'Residuo (real - predicho)'},title='Diagnóstico de residuos'),use_container_width=True)
+                st.caption(f'Modelo de referencia (predice media del entrenamiento): MAE={base_mae:.3f}. Los residuos ayudan a identificar sesgos y errores grandes.')
+                if compare:
+                    rows=[]
+                    for name,mdl in models.items():
+                        p2=Pipeline([('prep',pre),('model',mdl)]).fit(Xtr,ytr).predict(Xte)
+                        rows.append({'Algoritmo':name,'MAE':mean_absolute_error(yte,p2),'RMSE':np.sqrt(mean_squared_error(yte,p2)),'R²':r2_score(yte,p2)})
+                    st.subheader('Comparación exploratoria de modelos');st.dataframe(pd.DataFrame(rows).round(3),hide_index=True)
+                if cv:
+                    cvres=cross_validate(Pipeline([('prep',pre),('model',models[algorithm])]),Xtr,ytr,cv=KFold(n_splits=3,shuffle=True,random_state=int(seed)),scoring='neg_mean_absolute_error')
+                    values=-cvres['test_score'];st.caption(f'CV en entrenamiento, MAE: {values.mean():.3f} ± {values.std():.3f}')
             else:
                 Xt=pre.fit_transform(X)
-                models={'K-Means':KMeans(n_clusters=clusters,n_init=10,random_state=int(seed)),'Jerárquico':AgglomerativeClustering(n_clusters=clusters),'DBSCAN':DBSCAN(eps=.8,min_samples=5)}
+                models={'K-Means':KMeans(n_clusters=clusters,n_init=10,random_state=int(seed)),
+                        'Jerárquico':AgglomerativeClustering(n_clusters=clusters),
+                        'DBSCAN':DBSCAN(eps=.8,min_samples=5)}
                 labels=models[algorithm].fit_predict(Xt)
                 counts=pd.Series(labels).value_counts().sort_index()
-                score=silhouette_score(Xt,labels) if 1<len(set(labels))<len(labels) and len(Xt)<=2000 else np.nan
-                result=f'Agrupamiento {algorithm}: n={len(Xt)}, grupos/etiquetas={len(set(labels))}, silhouette={score:.3f} (si es calculable).'
+                unique=set(labels)
+                valid=(labels!=-1) if algorithm=='DBSCAN' else np.ones(len(labels),dtype=bool)
+                score=silhouette_score(Xt[valid],labels[valid]) if len(set(labels[valid]))>1 and len(set(labels[valid]))<sum(valid) and sum(valid)<=2000 else np.nan
+                result=f'Agrupamiento {algorithm}: n={len(Xt)}, grupos/etiquetas={len(unique)}, silhouette={score:.3f}.'
+                st.subheader('Grupos identificados')
                 st.dataframe(counts.rename_axis('Grupo').reset_index(name='Observaciones'),hide_index=True)
-                st.caption('En DBSCAN, la etiqueta -1 representa ruido. Silhouette es exploratorio y no valida perfiles pedagógicos.')
+                st.subheader('Mapa de agrupamiento (proyección PCA)')
+                coords=PCA(n_components=2,random_state=int(seed)).fit_transform(Xt)
+                pca=PCA(n_components=2,random_state=int(seed)).fit(Xt)
+                plotdf=pd.DataFrame({'Componente 1':coords[:,0],'Componente 2':coords[:,1],'Grupo':[str(x) if x!=-1 else 'Ruido (-1)' for x in labels]})
+                fig=px.scatter(plotdf,x='Componente 1',y='Componente 2',color='Grupo',title='Cada punto representa una observación',opacity=.75)
+                st.plotly_chart(fig,use_container_width=True)
+                st.caption(f'PCA explica {100*sum(pca.explained_variance_ratio_):.1f}% de la varianza del espacio transformado en estos dos ejes. La separación visual es aproximada, no una validación de perfiles.')
+                st.subheader('Caracterización de grupos')
+                profiles=X.copy();profiles['Grupo']=labels
+                if nums:
+                    st.dataframe(profiles.groupby('Grupo')[nums].mean().round(2),use_container_width=True)
+                    chosen=st.selectbox('Variable para comparar perfiles',nums)
+                    st.plotly_chart(px.box(profiles,x=profiles['Grupo'].astype(str),y=chosen,labels={'x':'Grupo'},title=f'{chosen} por grupo'),use_container_width=True)
+                else: st.info('Selecciona al menos una variable numérica para comparar medias por grupo.')
+                if compare and algorithm=='K-Means':
+                    values=[]
+                    for k in range(2,min(8,len(Xt)-1)+1):
+                        lb=KMeans(n_clusters=k,n_init=10,random_state=int(seed)).fit_predict(Xt)
+                        values.append({'k':k,'silhouette':silhouette_score(Xt,lb)})
+                    st.plotly_chart(px.line(pd.DataFrame(values),x='k',y='silhouette',markers=True,title='Comparación exploratoria de k'),use_container_width=True)
+                st.caption('Los grupos son patrones exploratorios, no diagnósticos de estudiantes. En DBSCAN, -1 identifica ruido.')
             st.success(result)
             st.session_state.ml_summary=result
-            text_box('**Hallazgo técnico:** '+result+' Es un resultado de esta ejecución, no una reproducción del artículo de referencia. Revisa sesgos, variables disponibles al momento de predicción, representatividad y posibles fugas de información.')
+            st.session_state.ml_details={'tarea':kind,'algoritmo':algorithm,'variables':predictors,'objetivo':target,'resultado':result}
+            if kind=='Regresión':
+                text_box(f'El error medio es **{mae:.2f}** unidades de la variable objetivo. R²={r2:.3f}. Compáralo con el baseline y revisa la dispersión y los residuos. No implica causalidad.')
+            elif kind=='Clasificación':
+                text_box(f'Accuracy **{acc:.3f}** frente a baseline **{baseline_acc:.3f}**; balanced accuracy **{bacc:.3f}**. Revisa las clases minoritarias antes de concluir que el clasificador es útil.')
+            else:
+                text_box(f'Se identificaron **{len(unique)} etiquetas** con silhouette **{score:.3f}**. Examina las medias por grupo y la proyección PCA; la estructura no equivale a perfiles pedagógicos validados.')
         except Exception as ex:
             st.error(f'No fue posible ejecutar el modelo: {ex}')
 
 st.divider()
-st.caption('LA-Lab v0.3 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
+st.caption('LA-Lab v0.4 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')

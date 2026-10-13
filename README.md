@@ -1,4 +1,4 @@
-# LA-Lab v0.3 — Laboratorio virtual de analítica del aprendizaje
+# LA-Lab v0.4 — Laboratorio virtual de analítica del aprendizaje
 
 Aplicación Streamlit para prácticas de análisis exploratorio, visualización, matriz de correlación y minería de datos. Línea de investigación: **Tecnologías Inteligentes para la Transformación Digital de los Ecosistemas Educativos**.
 
@@ -23,3 +23,13 @@ Aplicación Streamlit para prácticas de análisis exploratorio, visualización,
 - Sin claves API ni pagos. En Streamlit Community Cloud, la concurrencia de 50 personas requiere prueba de carga y no está garantizada.
 - Se admite carga de CSV, TSV, TXT delimitado, Excel, JSON de registros y Parquet hasta 10 MB. Para los CSV de Student Performance, usa `;` como separador (detección automática).
 - Logotipos oficiales: colocar `assets/unam.png` y `assets/cuaed.png` con autorización institucional; no se incluyen emblemas recreados.
+
+## Cambios en v0.4
+
+- Clasificación: matriz de confusión en mapa de calor, métricas por clase, baseline mayoritario y advertencia de desequilibrio.
+- Regresión: gráfico real vs. predicho con línea ideal, residuos y baseline de media.
+- Agrupamiento: dispersión PCA coloreada por grupos, caracterización de perfiles, diagramas de caja y comparación opcional de silhouette por k.
+- Comparación opcional de algoritmos y validación cruzada opcional en entrenamiento (sin ajustar modelos con el conjunto de prueba).
+- Descargas adicionales PDF textual y Excel de resultados tabulares; las figuras interactivas no se incrustan en PDF.
+
+**Alcance:** actualización de funciones; todavía no constituye reproducción verificada de resultados publicados. Los casos OULAD siguen requiriendo preparación manual. Para comparar modelos de forma científica, usar validación cruzada y un conjunto de prueba reservado para evaluación final, no seleccionar el mejor modelo por la misma prueba.
