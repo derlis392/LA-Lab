@@ -1,4 +1,4 @@
-"""LA-Lab v0.5.5 — Laboratorio abierto de Analítica del Aprendizaje."""
+"""LA-Lab v0.5.6 — Laboratorio abierto de Analítica del Aprendizaje."""
 import io
 import json
 from pathlib import Path
@@ -14,8 +14,8 @@ ROOT = Path(__file__).parent
 MAX_BYTES = 10 * 1024 * 1024
 # Catorce prácticas sobre tres fuentes originales; no son 14 datasets independientes.
 SOURCES = {
- 'student_mat': {'name':'Student Performance — Matemáticas', 'uci_id':320, 'url':'https://archive.ics.uci.edu/dataset/320/student+performance', 'article':'Cortez, P. & Silva, A. (2008). Using Data Mining to Predict Secondary School Student Performance.', 'article_url':'https://archive.ics.uci.edu/dataset/320/student+performance', 'license':'CC BY 4.0', 'target':'G3'},
- 'student_por': {'name':'Student Performance — Portugués', 'uci_id':320, 'url':'https://archive.ics.uci.edu/dataset/320/student+performance', 'article':'Cortez, P. & Silva, A. (2008). Using Data Mining to Predict Secondary School Student Performance.', 'article_url':'https://archive.ics.uci.edu/dataset/320/student+performance', 'license':'CC BY 4.0', 'target':'G3'},
+ 'student_mat': {'name':'Student Performance — Matemáticas', 'uci_id':320, 'url':'https://archive.ics.uci.edu/dataset/320/student+performance', 'article':'Cortez, P. & Silva, A. (2008). Using Data Mining to Predict Secondary School Student Performance.', 'article_url':'', 'license':'CC BY 4.0', 'target':'G3'},
+ 'student_por': {'name':'Student Performance — Portugués', 'uci_id':320, 'url':'https://archive.ics.uci.edu/dataset/320/student+performance', 'article':'Cortez, P. & Silva, A. (2008). Using Data Mining to Predict Secondary School Student Performance.', 'article_url':'', 'license':'CC BY 4.0', 'target':'G3'},
  'dropout': {'name':'Predict Students Dropout and Academic Success', 'uci_id':697, 'url':'https://archive.ics.uci.edu/dataset/697/predict+students+dropout+and+academic+success', 'article':'Realinho, V., Machado, J., Baptista, L. & Martins, M. (2022). Predicting Student Dropout and Academic Success. Data, 7(11), 146.', 'article_url':'https://doi.org/10.3390/data7110146', 'license':'CC BY 4.0', 'target':'Target'},
  'oulad': {'name':'Open University Learning Analytics Dataset (OULAD)', 'url':'https://analyse.kmi.open.ac.uk/open_dataset', 'article':'Kuzilek, J., Hlosta, M. & Zdrahal, Z. (2017). Open University Learning Analytics dataset. Scientific Data, 4, 170171.', 'article_url':'https://doi.org/10.1038/sdata.2017.171', 'license':'CC BY 4.0', 'target':'final_result'},
 }
@@ -128,7 +128,7 @@ h1,h2,h3 {letter-spacing:-.02em}
 
 with st.sidebar:
     st.title('🎓 LA-Lab')
-    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.5.5')
+    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.5.6')
     mode = st.radio('Modalidad', ['Casos guiados','Datos propios'],key='mode')
     idx = None
     if mode == 'Casos guiados':
@@ -170,7 +170,10 @@ if mode=='Casos guiados':
         st.write('**Fuente:** '+source['name'])
         st.link_button('Abrir fuente y descargar datos originales',source['url'])
         st.write('**Artículo asociado:** '+source['article'])
-        st.link_button('Consultar publicación de referencia',source['article_url'])
+        if source.get('article_url'):
+            st.link_button('Consultar publicación de referencia',source['article_url'])
+        else:
+            st.caption('Referencia bibliográfica disponible; enlace directo al artículo pendiente de verificación.')
         st.caption('Los artículos documentan los datos o su análisis; los resultados de LA-Lab son nuevos y no equivalen automáticamente a una reproducción.')
 else:
     if upload is None:
@@ -358,20 +361,20 @@ elif page=='6. Informe':
               'licencia':source.get('license','') if mode=='Casos guiados' else 'Verificar autorización del archivo',
               'reflexion':st.session_state.get('reflection','')}
     st.download_button('Descargar datos actuales (.csv)',csv_bytes(df),'datos_la_lab.csv','text/csv')
-    txt='LA-Lab v0.5.5 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
-    st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v055.txt','text/plain')
+    txt='LA-Lab v0.5.6 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
+    st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v056.txt','text/plain')
     st.caption(f'Generador de informes cargado: {getattr(reporting, "REPORT_VERSION", "ANTIGUO")} · archivo: {Path(reporting.__file__).name}')
     try:
-        if getattr(reporting, 'REPORT_VERSION', None) != '0.5.5':
+        if getattr(reporting, 'REPORT_VERSION', None) != '0.5.6':
             st.error('VERSIONES INCOMPATIBLES: actualiza reporting.py junto con app.py en la raíz del repositorio y reinicia Streamlit. No se descargará un PDF antiguo.')
         else:
             pdf=build_pdf(df,metadata,ml,plot)
-            st.download_button('Descargar informe académico v0.5.5 (.pdf)',pdf,'informe_la_lab_v055.pdf','application/pdf')
+            st.download_button('Descargar informe académico v0.5.6 (.pdf)',pdf,'informe_la_lab_v056.pdf','application/pdf')
     except Exception as exc:
         st.error(f'No se pudo generar el PDF: {exc}')
     try:
         xlsx=build_excel(df,metadata,ml)
-        st.download_button('Descargar libro de análisis (.xlsx)',xlsx,'analisis_la_lab_v055.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        st.download_button('Descargar libro de análisis (.xlsx)',xlsx,'analisis_la_lab_v056.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     except Exception as exc:
         st.error(f'No se pudo generar el Excel: {exc}')
     text_box('El informe incorpora análisis registrados, visualizaciones reproducibles, interpretación y sugerencias condicionadas. Las recomendaciones requieren revisión humana y no constituyen diagnóstico individual.')
@@ -468,6 +471,7 @@ elif page=='7. Minería de datos':
                 counts_all=y.value_counts()
                 if counts_all.min()<2: raise ValueError('Cada clase necesita al menos dos observaciones para particionar.')
                 Xtr,Xte,ytr,yte=train_test_split(X,y,test_size=test_pct/100,random_state=int(seed),stratify=y)
+                payload.update({'n_entrenamiento':len(Xtr),'n_prueba':len(Xte),'preprocesamiento_interno':'Imputación de numéricas por mediana, escalado estándar; imputación de categóricas por moda y codificación one-hot (según tipos presentes). Ajuste dentro del pipeline de entrenamiento.'})
                 pipe=Pipeline([('prep',pre),('model',models[algorithm])]);pipe.fit(Xtr,ytr);pred=pipe.predict(Xte)
                 labels=sorted(y.unique())
                 cm=confusion_matrix(yte,pred,labels=labels)
@@ -508,6 +512,7 @@ elif page=='7. Minería de datos':
                         'Árbol de regresión':DecisionTreeRegressor(max_depth=6,random_state=int(seed)),
                         'Random Forest':RandomForestRegressor(n_estimators=80,max_depth=10,random_state=int(seed),n_jobs=1)}
                 Xtr,Xte,ytr,yte=train_test_split(X,y,test_size=test_pct/100,random_state=int(seed))
+                payload.update({'n_entrenamiento':len(Xtr),'n_prueba':len(Xte),'preprocesamiento_interno':'Imputación de numéricas por mediana, escalado estándar; imputación de categóricas por moda y codificación one-hot (según tipos presentes). Ajuste dentro del pipeline de entrenamiento.'})
                 pipe=Pipeline([('prep',pre),('model',models[algorithm])]);pipe.fit(Xtr,ytr);pred=pipe.predict(Xte)
                 mae=mean_absolute_error(yte,pred);rmse=np.sqrt(mean_squared_error(yte,pred));r2=r2_score(yte,pred)
                 base=DummyRegressor(strategy='mean').fit(Xtr,ytr);base_mae=mean_absolute_error(yte,base.predict(Xte))
@@ -594,4 +599,4 @@ elif page=='7. Minería de datos':
             st.error(f'No fue posible ejecutar el modelo: {ex}')
 
 st.divider()
-st.caption('LA-Lab v0.5.5 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
+st.caption('LA-Lab v0.5.6 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')

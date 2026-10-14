@@ -1,5 +1,5 @@
 """LA-Lab: reportes reproducibles y narrativas cautelosas para educación."""
-REPORT_VERSION = "0.5.5"
+REPORT_VERSION = "0.5.6"
 import io
 from datetime import datetime
 from xml.sax.saxutils import escape
@@ -192,12 +192,14 @@ def build_pdf(df,meta,ml=None,plot=None):
     if logo_cells:
         logo_table=Table([[logo_cells[0],logo_cells[1]]] if len(logo_cells)==2 else [logo_cells],hAlign='LEFT',colWidths=[3*cm,12*cm] if len(logo_cells)==2 else None)
         story.append(logo_table);story.append(Spacer(1,12))
-    story.append(Paragraph('LA-Lab v0.5.5 | Informe académico de analítica del aprendizaje',styles['LabTitle']))
+    story.append(Paragraph('LA-Lab v0.5.6 | Informe académico de analítica del aprendizaje',styles['LabTitle']))
     para('Caso: '+meta['caso']);para('Generado: '+datetime.now().strftime('%Y-%m-%d %H:%M')+' | Documento exploratorio; revisión humana requerida')
     heading('1. Propósito y procedencia')
-    para('Pregunta de investigación: '+meta['pregunta']);para('Fuente: '+meta['fuente']);para('Licencia declarada: '+meta['licencia'])
+    para('Pregunta de investigación del caso: '+meta['pregunta']);para('Fuente: '+meta['fuente']);para('Licencia declarada: '+meta['licencia'])
+    if ml and ml.get('objetivo')=='G3' and 'evaluacion' in __import__('unicodedata').normalize('NFKD',meta['pregunta'].lower()).encode('ascii','ignore').decode('ascii') and not {'G1','G2'}.intersection(ml.get('variables',[])):
+        para('Nota de alcance: la pregunta general menciona evaluaciones, pero este experimento no incluye G1 ni G2. Sus resultados describen la asociación predictiva de las variables seleccionadas con G3; no responden directamente a la relación entre evaluaciones.')
     heading('2. Comprensión y calidad de datos');para(describe_data(df,meta['pregunta'],ml.get('objetivo') if ml else None))
-    para('Preparación registrada: '+meta['limpieza'])
+    para('Transformaciones manuales registradas: '+str(meta['limpieza']).rstrip('.'))
     numeric=df.select_dtypes(include='number');
     if not numeric.empty:
         stat=numeric.describe().T[['mean','std','min','50%','max']].head(12)
@@ -210,7 +212,7 @@ def build_pdf(df,meta,ml=None,plot=None):
     if not same_hist:
         figure('overview',f'Figura 1. Distribución de {overview_var}; observar concentración, rango y posibles valores extremos.')
     if len(numeric.columns)>1:
-        figure('correlation','Matriz de correlaciones de Pearson entre variables numéricas; las escalas ordinales requieren interpretación cautelosa.')
+        figure('correlation','Figura 2. Matriz de correlaciones de Pearson entre variables numéricas; las escalas ordinales requieren interpretación cautelosa.')
     if plot:
         if plot.get('tipo')!='correlacion':
             figure('plot','Gráfico exploratorio seleccionado: '+str(plot.get('tipo'))+'.')
@@ -221,7 +223,9 @@ def build_pdf(df,meta,ml=None,plot=None):
     if ml:
         para('Tarea: '+ml['tarea']+' | Algoritmo: '+ml['algoritmo']+' | Semilla: '+str(ml['semilla'])+' | N: '+str(ml['n']))
         para('Variable objetivo: '+str(ml.get('objetivo'))+' | Predictores: '+', '.join(ml['variables']))
-        if ml.get('porcentaje_prueba'):para('Partición de prueba: '+str(ml['porcentaje_prueba'])+' %. Preprocesamiento y ajuste del modelo deben restringirse al entrenamiento.')
+        if ml.get('porcentaje_prueba'):
+            para('Partición de prueba: '+str(ml['porcentaje_prueba'])+' %. Entrenamiento: '+str(ml.get('n_entrenamiento','no registrado'))+'; prueba: '+str(ml.get('n_prueba','no registrado'))+'.')
+            para('Preprocesamiento interno del modelo: '+str(ml.get('preprocesamiento_interno','Pipeline de imputación/codificación/escalado, ajustado exclusivamente sobre entrenamiento.')))
         table([['Métrica','Resultado']]+[[str(k),f'{v:.3f}' if isinstance(v,(int,float)) else str(v)] for k,v in ml.get('metricas',{}).items()])
         if ml['tarea']=='Agrupamiento' and ml.get('perfiles'):
             rows=ml['perfiles']; columns=list(rows[0])[:6]
@@ -230,7 +234,8 @@ def build_pdf(df,meta,ml=None,plot=None):
         figure('ml_primary',{'Regresión':'Valores reales frente a predicciones. La línea diagonal indica predicción perfecta.','Clasificación':'Matriz de confusión: filas reales, columnas predichas; examine errores de cada clase.','Agrupamiento':'Proyección PCA de grupos: la separación visual no valida perfiles.'}[ml['tarea']])
         figure('ml_secondary',{'Regresión':'Residuos: los errores grandes o patrones sistemáticos requieren revisión.','Clasificación':'Precisión, recall y F1 por clase: contraste el rendimiento minoritario.','Agrupamiento':'Comparación de silhouette por k o distribución de tamaños de grupos.'}[ml['tarea']])
         if ml.get('comparacion'):
-            heading('4.1 Comparación de algoritmos')
+            heading('4.1 Comparación exploratoria de algoritmos')
+            para('Las métricas de esta comparación se calcularon sobre el mismo conjunto de prueba únicamente para ilustración. No deben utilizarse para elegir el algoritmo ganador; la selección formal requiere validación cruzada dentro del conjunto de entrenamiento y evaluación final única sobre prueba.')
             rows=ml['comparacion'];keys=list(rows[0]);table([keys]+[[f'{r[k]:.3f}' if isinstance(r[k],(int,float)) else str(r[k]) for k in keys] for r in rows]);figure('comparison','Comparación de algoritmos según la métrica principal del experimento.')
         if ml.get('validacion_cruzada'):
             cv=ml['validacion_cruzada'];para(f'Validación cruzada en entrenamiento ({len(cv["valores"])} particiones): {cv["metrica"]} = {np.mean(cv["valores"]):.3f} ± {np.std(cv["valores"]):.3f}. Valores por partición: '+', '.join(f'{v:.3f}' for v in cv['valores']))
@@ -248,7 +253,8 @@ def build_pdf(df,meta,ml=None,plot=None):
     if meta.get('fuente_url'):para('Repositorio y descarga original: '+str(meta['fuente_url']))
     para('Licencia declarada: '+str(meta.get('licencia','No especificada; verificar condiciones de uso')))
     if meta.get('articulo'):para('Publicación de referencia: '+str(meta['articulo']))
-    if meta.get('articulo_url'):para('Enlace de referencia: '+str(meta['articulo_url']))
+    if meta.get('articulo_url'):para('Enlace directo a la publicación: '+str(meta['articulo_url']))
+    elif meta.get('articulo'):para('Enlace directo a la publicación: pendiente de verificación; no confundir la ficha del conjunto de datos con el artículo.')
     para('Los análisis de LA-Lab son exploratorios y no constituyen una reproducción automática de los resultados publicados.')
     import hashlib, json, platform, importlib.metadata
     fingerprint=hashlib.sha256(pd.util.hash_pandas_object(df,index=True).values.tobytes()).hexdigest()[:16]
@@ -256,11 +262,11 @@ def build_pdf(df,meta,ml=None,plot=None):
     if ml:
         para('Configuración: tarea='+str(ml.get('tarea'))+'; algoritmo='+str(ml.get('algoritmo'))+'; objetivo='+str(ml.get('objetivo'))+'; predictores='+', '.join(map(str,ml.get('variables',[])))+'; semilla='+str(ml.get('semilla'))+'; porcentaje de prueba='+str(ml.get('porcentaje_prueba','No aplica'))+'.')
         if ml.get('porcentaje_prueba'):
-            n_test=int(np.ceil(ml.get('n',len(df))*float(ml['porcentaje_prueba'])/100))
-            para('Tamaños orientativos según porcentaje declarado: entrenamiento ≈ '+str(ml.get('n',len(df))-n_test)+'; prueba ≈ '+str(n_test)+'. Confirmar tamaños efectivos tras exclusión de registros incompletos o estratificación.')
+            para('Tamaños efectivos registrados: entrenamiento = '+str(ml.get('n_entrenamiento','no disponible'))+'; prueba = '+str(ml.get('n_prueba','no disponible'))+'.')
         if ml.get('validacion_cruzada'):
             para('Validación cruzada realizada exclusivamente en entrenamiento; consultar métricas y particiones en la sección 4.')
-    para('Preparación de datos: '+str(meta.get('limpieza','Sin operaciones registradas'))+'. El preprocesamiento supervisado debe ajustarse solo sobre entrenamiento para evitar fuga de información.')
+    para('Transformaciones manuales: '+str(meta.get('limpieza','Sin operaciones registradas')).rstrip('.')+'.')
+    if ml and ml.get('preprocesamiento_interno'):para('Preprocesamiento supervisado interno: '+str(ml['preprocesamiento_interno']))
     packages=['pandas','numpy','scikit-learn','matplotlib','reportlab','streamlit']
     versions=[]
     for package in packages:
@@ -268,7 +274,7 @@ def build_pdf(df,meta,ml=None,plot=None):
         except importlib.metadata.PackageNotFoundError:pass
     para('Entorno: Python '+platform.python_version()+'; '+ '; '.join(versions)+'. Versión de LA-Lab: '+REPORT_VERSION+'.')
     def footer(canvas,doc):
-        canvas.setFont('Helvetica',8);canvas.setFillColor(colors.grey);canvas.drawString(1.8*cm,1.1*cm,'LA-Lab v0.5.5 · Informe exploratorio · No tomar decisiones automatizadas sobre estudiantes');canvas.drawRightString(19.2*cm,1.1*cm,str(doc.page))
+        canvas.setFont('Helvetica',8);canvas.setFillColor(colors.grey);canvas.drawString(1.8*cm,1.1*cm,'LA-Lab v0.5.6 · Informe exploratorio · No tomar decisiones automatizadas sobre estudiantes');canvas.drawRightString(19.2*cm,1.1*cm,str(doc.page))
     doc.build(story,onFirstPage=footer,onLaterPages=footer);return buf.getvalue()
 
 

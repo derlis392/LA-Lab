@@ -61,14 +61,3 @@ Copiar a la raíz del repositorio `app.py`, `reporting.py` y `requirements.txt` 
 
 ## Control de versiones de informes (v0.5.4)
 Actualizar **app.py y reporting.py juntos**, en la raíz del repositorio. La pantalla del módulo 6 muestra la versión real del generador importado. Si no es 0.5.4, bloquea la descarga del PDF en lugar de ofrecer una versión anterior. Descargar `informe_la_lab_v054.pdf` y verificar que título y pie muestren v0.5.4. La sección 7 comienza en página nueva para evitar encabezados huérfanos.
-
-
-## Cambios v0.5.5 (14 de octubre de 2026)
-- PDF: encabezados protegidos de saltos huérfanos, figuras compactas y explicaciones situadas junto a las gráficas.
-- Referencias: fuente, artículo, enlace y licencia declarada en sección final.
-- Reproducibilidad: identificador abreviado de datos, parámetros, biblioteca y versión Python.
-- Interpretación de R²: definición matemática precisa (SSE/SST).
-- Exportación: comprobación de compatibilidad `app.py`/`reporting.py` en v0.5.5.
-- Se preservan los logotipos institucionales y los módulos originales.
-
-**Nota:** El tamaño de partición incluido en el PDF es orientativo; puede variar según exclusiones y estratificación. Los datos OULAD se cargan manualmente desde la fuente original.
