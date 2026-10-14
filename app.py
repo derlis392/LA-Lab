@@ -1,4 +1,4 @@
-"""LA-Lab v0.5.1 — Laboratorio abierto de Analítica del Aprendizaje."""
+"""LA-Lab v0.5.2 — Laboratorio abierto de Analítica del Aprendizaje."""
 import io
 import json
 from pathlib import Path
@@ -127,7 +127,7 @@ h1,h2,h3 {letter-spacing:-.02em}
 
 with st.sidebar:
     st.title('🎓 LA-Lab')
-    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.5.1')
+    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.5.2')
     mode = st.radio('Modalidad', ['Casos guiados','Datos propios'],key='mode')
     idx = None
     if mode == 'Casos guiados':
@@ -137,20 +137,21 @@ with st.sidebar:
     page = st.radio('Módulo',['Inicio','1. Datos','2. Limpieza','3. Indicadores','4. Visualización','5. Interpretación','6. Informe','7. Minería de datos'])
     st.warning('Utiliza datos sintéticos o autorizados y desidentificados. No cargues datos personales sensibles.')
 
-header_left, header_right = st.columns([4,1])
+header_left, header_right = st.columns([3.5, 1.6], vertical_alignment="top")
 with header_left:
     st.title('🎓 LA-Lab')
     st.caption('Tecnologías Inteligentes para la Transformación Digital de los Ecosistemas Educativos')
     st.caption('Dr. Derlis Hernández Lara · CUAED · Universidad Nacional Autónoma de México')
 with header_right:
     logos = ROOT/'assets'
-    logos_found = [(label, logos/file) for label,file in [('UNAM','unam.png'),('CUAED','cuaed.png')] if (logos/file).exists()]
-    if logos_found:
-        cols = st.columns(len(logos_found))
-        for col,(label,p) in zip(cols,logos_found): col.image(str(p),caption=label,use_container_width=True)
+    unam, cuaed = logos/'unam.png', logos/'cuaed.png'
+    if unam.exists() and cuaed.exists():
+        # Columnas independientes: evitan que el logotipo horizontal de CUAED se recorte.
+        col_unam, col_cuaed = st.columns([1, 2.2], vertical_alignment="center")
+        with col_unam: st.image(str(unam), width=90)
+        with col_cuaed: st.image(str(cuaed), use_container_width=True)
     else:
-        st.markdown('**UNAM · CUAED**')
-        st.caption('Logotipos oficiales pendientes de incorporar')
+        st.caption('Identidad institucional: emblemas pendientes')
 
 if mode=='Casos guiados':
     title, source_id, question, suggested_target = CASES[idx]
@@ -355,7 +356,7 @@ elif page=='6. Informe':
               'licencia':source.get('license','') if mode=='Casos guiados' else 'Verificar autorización del archivo',
               'reflexion':st.session_state.get('reflection','')}
     st.download_button('Descargar datos actuales (.csv)',csv_bytes(df),'datos_la_lab.csv','text/csv')
-    txt='LA-Lab v0.5.1 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
+    txt='LA-Lab v0.5.2 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
     st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v05.txt','text/plain')
     try:
         pdf=build_pdf(df,metadata,ml,plot)
@@ -587,4 +588,4 @@ elif page=='7. Minería de datos':
             st.error(f'No fue posible ejecutar el modelo: {ex}')
 
 st.divider()
-st.caption('LA-Lab v0.5.1 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
+st.caption('LA-Lab v0.5.2 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')

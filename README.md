@@ -42,3 +42,10 @@ Copiar a la raíz del repositorio `app.py`, `reporting.py` y `requirements.txt` 
 - Student Performance: https://archive.ics.uci.edu/dataset/320/student+performance
 - Predict Students' Dropout and Academic Success: https://archive.ics.uci.edu/dataset/697/predict+students+dropout+and+academic+success
 - OULAD: https://analyse.kmi.open.ac.uk/open_dataset
+
+
+## v0.5.2 — correcciones consolidadas
+- Cabecera: logotipos UNAM/CUAED en columnas con proporciones diferenciadas y sin etiquetas redundantes.
+- Reportes: versión unificada v0.5.2 en app, PDF y pie de página; imágenes más compactas; prevención de histogramas duplicados; leyendas específicas y referencias sin URLs repetidas.
+- Validación pendiente tras despliegue: probar PDF nuevo en Streamlit Cloud, las tres tareas de ML y exportación Excel.
+- Los resultados de comparación entre modelos en prueba son exploratorios: no elegir el modelo final optimizando sobre ese conjunto.

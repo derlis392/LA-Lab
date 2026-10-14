@@ -176,7 +176,7 @@ def build_pdf(df,meta,ml=None,plot=None):
         png=_chart_image(df,plot,ml,which)
         if png:
             from PIL import Image as PILImage
-            im=PILImage.open(png);w,h=im.size; maxw=16.5*cm;maxh=10*cm;scale=min(maxw/w,maxh/h)
+            im=PILImage.open(png);w,h=im.size; maxw=16.5*cm;maxh=8.0*cm;scale=min(maxw/w,maxh/h)
             png.seek(0)
             story.append(KeepTogether([Image(png,width=w*scale,height=h*scale),Paragraph(escape(caption),styles['LabBody'])]))
     from pathlib import Path
@@ -191,7 +191,7 @@ def build_pdf(df,meta,ml=None,plot=None):
     if logo_cells:
         logo_table=Table([[logo_cells[0],logo_cells[1]]] if len(logo_cells)==2 else [logo_cells],hAlign='LEFT',colWidths=[3*cm,12*cm] if len(logo_cells)==2 else None)
         story.append(logo_table);story.append(Spacer(1,12))
-    story.append(Paragraph('LA-Lab v0.5.1 | Informe académico de analítica del aprendizaje',styles['LabTitle']))
+    story.append(Paragraph('LA-Lab v0.5.2 | Informe académico de analítica del aprendizaje',styles['LabTitle']))
     para('Caso: '+meta['caso']);para('Generado: '+datetime.now().strftime('%Y-%m-%d %H:%M')+' | Documento exploratorio; revisión humana requerida')
     heading('1. Propósito y procedencia')
     para('Pregunta de investigación: '+meta['pregunta']);para('Fuente: '+meta['fuente']);para('Licencia declarada: '+meta['licencia'])
@@ -201,10 +201,21 @@ def build_pdf(df,meta,ml=None,plot=None):
     if not numeric.empty:
         stat=numeric.describe().T[['mean','std','min','50%','max']].head(12)
         table([['Variable','Media','DE','Mín.','Mediana','Máx.']]+[[str(k)]+[f'{v:.2f}' for v in row] for k,row in stat.iterrows()])
-    figure('overview','Figura 1. Distribución descriptiva de una variable del conjunto.')
-    if len(numeric.columns)>1:figure('correlation','Figura 2. Correlaciones lineales; interpretar con cautela variables ordinales o codificadas.')
-    heading('3. Visualización e interpretación exploratoria');para(summarize_plot(df,plot))
-    if plot and plot.get('tipo')!='correlacion':figure('plot','Figura 3. Visualización seleccionada: '+str(plot.get('tipo'))+'.')
+    heading('3. Visualización e interpretación exploratoria')
+    selected = plot.get('x') if plot else None
+    overview_var = (ml.get('objetivo') if ml else None) or (str(numeric.columns[0]) if len(numeric.columns) else str(df.columns[0]))
+    # Evitar repetir la misma distribución como figura descriptiva y figura seleccionada.
+    same_hist = bool(plot and plot.get('tipo')=='histograma' and selected==overview_var)
+    if not same_hist:
+        figure('overview',f'Figura 1. Distribución de {overview_var}; observar concentración, rango y posibles valores extremos.')
+    if len(numeric.columns)>1:
+        figure('correlation','Matriz de correlaciones de Pearson entre variables numéricas; las escalas ordinales requieren interpretación cautelosa.')
+    if plot:
+        para(summarize_plot(df,plot))
+        if plot.get('tipo')!='correlacion':
+            figure('plot','Gráfico seleccionado en el módulo de visualización: '+str(plot.get('tipo'))+'.')
+    else:
+        para('No se seleccionó un gráfico específico; las figuras descriptivas no sustituyen un análisis contextual.')
     heading('4. Minería de datos y evaluación')
     if ml:
         para('Tarea: '+ml['tarea']+' | Algoritmo: '+ml['algoritmo']+' | Semilla: '+str(ml['semilla'])+' | N: '+str(ml['n']))
@@ -232,11 +243,15 @@ def build_pdf(df,meta,ml=None,plot=None):
     para('Limitaciones: el análisis exploratorio no demuestra causalidad; los resultados de una sola partición no acreditan generalización externa. Las variables de rendimiento pueden estar temporalmente relacionadas y producir fuga de información. Los conjuntos educativos requieren controles de privacidad, representatividad y revisión ética.')
     if meta.get('reflexion'):heading('Reflexión de la persona participante');para(meta['reflexion'])
     heading('7. Fuentes y reproducibilidad')
+    # Mantener íntegra la sección final, sin páginas huérfanas.
+    reference_items=[]
     for key in ['fuente_url','articulo','articulo_url']:
-        if meta.get(key):para(meta[key])
-    para('Los resultados calculados por LA-Lab no son una reproducción automática de los resultados del artículo asociado. Para reproducir el experimento se requieren los datos originales, las variables seleccionadas, la semilla, el preprocesamiento y la versión del código.')
+        if meta.get(key) and str(meta[key]) not in [str(v) for v in reference_items]:reference_items.append(meta[key])
+    ref_text='Fuentes: '+' | '.join(str(x) for x in reference_items)
+    repro='Los resultados de LA-Lab no reproducen automáticamente los del artículo citado. Reproducibilidad: datos originales, variables, semilla, partición, preprocesamiento y versión del código.'
+    story.append(KeepTogether([Paragraph(escape(ref_text),styles['LabBody']),Paragraph(escape(repro),styles['LabBody'])]))
     def footer(canvas,doc):
-        canvas.setFont('Helvetica',8);canvas.setFillColor(colors.grey);canvas.drawString(1.8*cm,1.1*cm,'LA-Lab v0.5.1 · Informe exploratorio · No tomar decisiones automatizadas sobre estudiantes');canvas.drawRightString(19.2*cm,1.1*cm,str(doc.page))
+        canvas.setFont('Helvetica',8);canvas.setFillColor(colors.grey);canvas.drawString(1.8*cm,1.1*cm,'LA-Lab v0.5.2 · Informe exploratorio · No tomar decisiones automatizadas sobre estudiantes');canvas.drawRightString(19.2*cm,1.1*cm,str(doc.page))
     doc.build(story,onFirstPage=footer,onLaterPages=footer);return buf.getvalue()
 
 
