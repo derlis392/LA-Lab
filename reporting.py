@@ -1,5 +1,5 @@
 """LA-Lab: reportes reproducibles y narrativas cautelosas para educación."""
-REPORT_VERSION = "0.5.4"
+REPORT_VERSION = "0.5.5"
 import io
 from datetime import datetime
 from xml.sax.saxutils import escape
@@ -155,7 +155,7 @@ def _chart_image(df,plot,ml,which):
 
 
 def build_pdf(df,meta,ml=None,plot=None):
-    from reportlab.platypus import SimpleDocTemplate,Paragraph,Spacer,Image,Table,TableStyle,PageBreak,KeepTogether
+    from reportlab.platypus import SimpleDocTemplate,Paragraph,Spacer,Image,Table,TableStyle,KeepTogether,CondPageBreak
     from reportlab.lib.styles import getSampleStyleSheet,ParagraphStyle
     from reportlab.lib import colors
     from reportlab.lib.enums import TA_CENTER
@@ -164,10 +164,10 @@ def build_pdf(df,meta,ml=None,plot=None):
     buf=io.BytesIO();doc=SimpleDocTemplate(buf,pagesize=A4,leftMargin=1.8*cm,rightMargin=1.8*cm,topMargin=1.7*cm,bottomMargin=1.8*cm)
     styles=getSampleStyleSheet();styles.add(ParagraphStyle(name='LabTitle',parent=styles['Title'],fontSize=19,leading=23,textColor=colors.HexColor('#15375b'),spaceAfter=14))
     styles.add(ParagraphStyle(name='LabBody',parent=styles['BodyText'],fontSize=9.5,leading=14,spaceAfter=8))
-    styles.add(ParagraphStyle(name='LabH',parent=styles['Heading2'],textColor=colors.HexColor('#15375b'),spaceBefore=13,spaceAfter=7))
+    styles.add(ParagraphStyle(name='LabH',parent=styles['Heading2'],textColor=colors.HexColor('#15375b'),spaceBefore=13,spaceAfter=7,keepWithNext=True))
     story=[]
     def para(text):story.append(Paragraph(escape(str(text)).replace('\n','<br/>'),styles['LabBody']))
-    def heading(text):story.append(Paragraph(escape(text),styles['LabH']))
+    def heading(text):story.append(CondPageBreak(2.3*cm));story.append(Paragraph(escape(text),styles['LabH']))
     def table(rows):
         cells=[[Paragraph(escape(str(x)),styles['LabBody']) for x in row] for row in rows]
         t=Table(cells,repeatRows=1,hAlign='LEFT',colWidths=None)
@@ -177,7 +177,7 @@ def build_pdf(df,meta,ml=None,plot=None):
         png=_chart_image(df,plot,ml,which)
         if png:
             from PIL import Image as PILImage
-            im=PILImage.open(png);w,h=im.size; maxw=16.5*cm;maxh=8.0*cm;scale=min(maxw/w,maxh/h)
+            im=PILImage.open(png);w,h=im.size; maxw=16.5*cm;maxh=6.8*cm;scale=min(maxw/w,maxh/h)
             png.seek(0)
             story.append(KeepTogether([Image(png,width=w*scale,height=h*scale),Paragraph(escape(caption),styles['LabBody'])]))
     from pathlib import Path
@@ -192,7 +192,7 @@ def build_pdf(df,meta,ml=None,plot=None):
     if logo_cells:
         logo_table=Table([[logo_cells[0],logo_cells[1]]] if len(logo_cells)==2 else [logo_cells],hAlign='LEFT',colWidths=[3*cm,12*cm] if len(logo_cells)==2 else None)
         story.append(logo_table);story.append(Spacer(1,12))
-    story.append(Paragraph('LA-Lab v0.5.4 | Informe académico de analítica del aprendizaje',styles['LabTitle']))
+    story.append(Paragraph('LA-Lab v0.5.5 | Informe académico de analítica del aprendizaje',styles['LabTitle']))
     para('Caso: '+meta['caso']);para('Generado: '+datetime.now().strftime('%Y-%m-%d %H:%M')+' | Documento exploratorio; revisión humana requerida')
     heading('1. Propósito y procedencia')
     para('Pregunta de investigación: '+meta['pregunta']);para('Fuente: '+meta['fuente']);para('Licencia declarada: '+meta['licencia'])
@@ -212,9 +212,9 @@ def build_pdf(df,meta,ml=None,plot=None):
     if len(numeric.columns)>1:
         figure('correlation','Matriz de correlaciones de Pearson entre variables numéricas; las escalas ordinales requieren interpretación cautelosa.')
     if plot:
-        para(summarize_plot(df,plot))
         if plot.get('tipo')!='correlacion':
-            figure('plot','Gráfico seleccionado en el módulo de visualización: '+str(plot.get('tipo'))+'.')
+            figure('plot','Gráfico exploratorio seleccionado: '+str(plot.get('tipo'))+'.')
+        para(summarize_plot(df,plot))
     else:
         para('No se seleccionó un gráfico específico; las figuras descriptivas no sustituyen un análisis contextual.')
     heading('4. Minería de datos y evaluación')
@@ -235,7 +235,7 @@ def build_pdf(df,meta,ml=None,plot=None):
         if ml.get('validacion_cruzada'):
             cv=ml['validacion_cruzada'];para(f'Validación cruzada en entrenamiento ({len(cv["valores"])} particiones): {cv["metrica"]} = {np.mean(cv["valores"]):.3f} ± {np.std(cv["valores"]):.3f}. Valores por partición: '+', '.join(f'{v:.3f}' for v in cv['valores']))
         heading('5. Interpretación contextualizada');para(explain_ml(ml))
-        if ml['tarea']=='Regresión':para('MAE expresa el error absoluto promedio en unidades del objetivo; RMSE penaliza más los errores grandes; R² compara la variación explicada frente a predecir la media de prueba. Examine el modelo de referencia y la estabilidad fuera de la muestra.')
+        if ml['tarea']=='Regresión':para('MAE expresa el error absoluto promedio en unidades del objetivo; RMSE penaliza más los errores grandes; R² = 1 - SSE/SST, donde SSE es la suma de errores cuadrados y SST es la suma de desviaciones cuadráticas de los valores reales respecto de su media; puede ser negativo. Examine el modelo de referencia y la estabilidad fuera de la muestra.')
         elif ml['tarea']=='Clasificación':para('Accuracy mide la proporción de aciertos; balanced accuracy promedia el recall de las clases; F1 macro promedia los F1 sin ponderar por tamaño. Con clases desbalanceadas, accuracy puede ocultar errores en la minoría.')
         else:para('Silhouette compara cohesión y separación de grupos; valores próximos a cero sugieren superposición. La elección de k exige también estabilidad, interpretabilidad y justificación educativa.')
     else:para('No se registró un experimento de minería de datos en esta sesión. No se reportan métricas ni conclusiones no ejecutadas.')
@@ -243,18 +243,32 @@ def build_pdf(df,meta,ml=None,plot=None):
     para('Recomendación docente: formular hipótesis verificables a partir de los patrones observados, contrastar explicaciones alternativas y documentar el contexto, la temporalidad y las escalas de las variables. Utilizar el informe como evidencia de una práctica de análisis, no como diagnóstico automático.')
     para('Limitaciones: el análisis exploratorio no demuestra causalidad; los resultados de una sola partición no acreditan generalización externa. Las variables de rendimiento pueden estar temporalmente relacionadas y producir fuga de información. Los conjuntos educativos requieren controles de privacidad, representatividad y revisión ética.')
     if meta.get('reflexion'):heading('Reflexión de la persona participante');para(meta['reflexion'])
-    # Encabezado y contenido de fuentes deben permanecer juntos.
-    # Mantener íntegra la sección final, sin páginas huérfanas.
-    reference_items=[]
-    for key in ['fuente_url','articulo','articulo_url']:
-        if meta.get(key) and str(meta[key]) not in [str(v) for v in reference_items]:reference_items.append(meta[key])
-    ref_text='Fuentes y artículos: '+' | '.join(str(x) for x in reference_items)
-    repro='Los resultados de LA-Lab no reproducen automáticamente los del artículo citado. Reproducibilidad: datos originales, variables, semilla, partición, preprocesamiento y versión del código.'
-    # Página propia: evita encabezados huérfanos y una página de referencias casi vacía.
-    story.append(PageBreak())
-    story.append(KeepTogether([Paragraph('7. Fuentes y reproducibilidad',styles['LabH']),Paragraph(escape(ref_text),styles['LabBody']),Paragraph(escape(repro),styles['LabBody'])]))
+    heading('7. Fuentes, referencias y reproducibilidad')
+    para('Conjunto de datos: '+str(meta.get('fuente','No especificado')))
+    if meta.get('fuente_url'):para('Repositorio y descarga original: '+str(meta['fuente_url']))
+    para('Licencia declarada: '+str(meta.get('licencia','No especificada; verificar condiciones de uso')))
+    if meta.get('articulo'):para('Publicación de referencia: '+str(meta['articulo']))
+    if meta.get('articulo_url'):para('Enlace de referencia: '+str(meta['articulo_url']))
+    para('Los análisis de LA-Lab son exploratorios y no constituyen una reproducción automática de los resultados publicados.')
+    import hashlib, json, platform, importlib.metadata
+    fingerprint=hashlib.sha256(pd.util.hash_pandas_object(df,index=True).values.tobytes()).hexdigest()[:16]
+    para('Identificador de los datos analizados (SHA-256 abreviado del hash de filas): '+fingerprint+'; filas: '+str(len(df))+'; columnas: '+str(len(df.columns))+'.')
+    if ml:
+        para('Configuración: tarea='+str(ml.get('tarea'))+'; algoritmo='+str(ml.get('algoritmo'))+'; objetivo='+str(ml.get('objetivo'))+'; predictores='+', '.join(map(str,ml.get('variables',[])))+'; semilla='+str(ml.get('semilla'))+'; porcentaje de prueba='+str(ml.get('porcentaje_prueba','No aplica'))+'.')
+        if ml.get('porcentaje_prueba'):
+            n_test=int(np.ceil(ml.get('n',len(df))*float(ml['porcentaje_prueba'])/100))
+            para('Tamaños orientativos según porcentaje declarado: entrenamiento ≈ '+str(ml.get('n',len(df))-n_test)+'; prueba ≈ '+str(n_test)+'. Confirmar tamaños efectivos tras exclusión de registros incompletos o estratificación.')
+        if ml.get('validacion_cruzada'):
+            para('Validación cruzada realizada exclusivamente en entrenamiento; consultar métricas y particiones en la sección 4.')
+    para('Preparación de datos: '+str(meta.get('limpieza','Sin operaciones registradas'))+'. El preprocesamiento supervisado debe ajustarse solo sobre entrenamiento para evitar fuga de información.')
+    packages=['pandas','numpy','scikit-learn','matplotlib','reportlab','streamlit']
+    versions=[]
+    for package in packages:
+        try:versions.append(package+' '+importlib.metadata.version(package))
+        except importlib.metadata.PackageNotFoundError:pass
+    para('Entorno: Python '+platform.python_version()+'; '+ '; '.join(versions)+'. Versión de LA-Lab: '+REPORT_VERSION+'.')
     def footer(canvas,doc):
-        canvas.setFont('Helvetica',8);canvas.setFillColor(colors.grey);canvas.drawString(1.8*cm,1.1*cm,'LA-Lab v0.5.4 · Informe exploratorio · No tomar decisiones automatizadas sobre estudiantes');canvas.drawRightString(19.2*cm,1.1*cm,str(doc.page))
+        canvas.setFont('Helvetica',8);canvas.setFillColor(colors.grey);canvas.drawString(1.8*cm,1.1*cm,'LA-Lab v0.5.5 · Informe exploratorio · No tomar decisiones automatizadas sobre estudiantes');canvas.drawRightString(19.2*cm,1.1*cm,str(doc.page))
     doc.build(story,onFirstPage=footer,onLaterPages=footer);return buf.getvalue()
 
 
