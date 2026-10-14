@@ -1,4 +1,4 @@
-# LA-Lab v0.6.1 — Laboratorio Virtual de Analítica del Aprendizaje
+# LA-Lab v0.6.2 — Laboratorio Virtual de Analítica del Aprendizaje
 
 Aplicación educativa abierta con siete módulos y **14 prácticas guiadas basadas en dos colecciones reales de UCI**. Las prácticas son preguntas diferentes sobre los mismos conjuntos de datos, no 14 datasets independientes.
 
@@ -9,30 +9,31 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Cambios de v0.6.1
+## Cambios de v0.6.2
 
-- Los casos **12, 13 y 14** ya no solicitan el ZIP grande de OULAD. Se cargan automáticamente desde UCI, con botón de descarga del CSV y pregunta orientadora específica.
-- Caso 12: **Progreso curricular y resultados** (unidades curriculares del primer semestre y trayectoria).
-- Caso 13: **Desempeño entre semestres** (evaluaciones y calificaciones del primer y segundo semestre).
-- Caso 14: **Factores de permanencia** (situación de matrícula, becas, edad y trayectoria).
-- El límite **global** de subida es de **10 MB**, incluido el laboratorio libre. No se requiere aumentar ese límite.
-- `requirements.txt`, `reporting.py`, `app.py`, este README y `.streamlit/config.toml` se actualizaron de manera coordinada.
-- Los informes PDF y Excel siguen disponibles en el módulo 6; solo incluyen resultados calculados en la sesión.
-- Los logotipos proporcionados de UNAM y CUAED se conservan en `assets/`. Su uso institucional debe respetar la autorización aplicable.
+- **Caso 12: Respuestas y dificultades en matemáticas**: MathE, UCI 1031 (9546 respuestas, 8 variables). Se estudian respuestas correctas/incorrectas por tema y dificultad; cada registro es una respuesta, no un estudiante independiente.
+- **Caso 13: Hábitos de estudio y desempeño universitario**: Higher Education Students Performance Evaluation, UCI 856 (145 estudiantes, 31 características y calificación objetivo). Los campos codificados se interpretan con el diccionario oficial.
+- **Caso 14: Factores de permanencia universitaria**: Predict Students’ Dropout and Academic Success, UCI 697. Se analizan matrícula, becas y trayectoria, sin inferencia causal.
+- Los tres casos tienen **fuentes originales diferentes** y se cargan automáticamente, con descarga del CSV de la práctica y enlace a fuente/artículo.
+- El límite global de carga sigue siendo **10 MB**. No se necesita subir ZIP para casos guiados.
+- `app.py`, `reporting.py`, `requirements.txt`, `README.md` y `.streamlit/config.toml` están sincronizados con v0.6.2.
+- PDF y XLSX se mantienen en el módulo 6. Los logotipos proporcionados se conservan en `assets/`.
 
 ## Fuentes académicas y acceso directo
 
-- [Student Performance — UCI](https://archive.ics.uci.edu/dataset/320/student+performance)
-- [Predict Students' Dropout and Academic Success — UCI](https://archive.ics.uci.edu/dataset/697/predict+students+dropout+and+academic+success)
-- [OULAD — fuente original complementaria](https://analyse.kmi.open.ac.uk/open_dataset) (no se usa como fuente de los casos 12–14 en esta versión).
+- [MathE — UCI 1031](https://archive.ics.uci.edu/dataset/1031/dataset+for+assessing+mathematics+learning+in+higher+educa) — [artículo](https://doi.org/10.1016/j.dib.2024.110236)
+- [Higher Education Students Performance Evaluation — UCI 856](https://archive.ics.uci.edu/dataset/856/higher+education+students+performance+evaluation) — [registro y DOI](https://doi.org/10.24432/C51G82)
+- [Predict Students' Dropout and Academic Success — UCI 697](https://archive.ics.uci.edu/dataset/697/predict+students+dropout+and+academic+success) — [artículo](https://doi.org/10.3390/data7110146)
+- [Student Performance — UCI 320](https://archive.ics.uci.edu/dataset/320/student+performance)
+- [OULAD — referencia complementaria](https://analyse.kmi.open.ac.uk/open_dataset)
 
 ## Alcance y cautelas
 
-Las prácticas 12–14 **no miden clics en entornos virtuales**: se redefinieron para analizar variables curriculares y de permanencia de UCI. La aplicación descarga las fuentes originales al ejecutarse, por lo que necesita conectividad desde Streamlit Cloud. Los modelos y comparaciones son exploratorios, no se replican automáticamente los resultados de los artículos y no deben usarse para decisiones individuales automatizadas.
+Las prácticas 12–14 **no miden clics en entornos virtuales**: se redefinieron para analizar respuestas matemáticas, desempeño y permanencia a partir de tres colecciones UCI diferentes. La aplicación descarga las fuentes originales al ejecutarse, por lo que necesita conectividad desde Streamlit Cloud. Los modelos y comparaciones son exploratorios, no se replican automáticamente los resultados de los artículos y no deben usarse para decisiones individuales automatizadas.
 
 ## Despliegue
 
-Subir **todos los archivos de este ZIP** a la raíz de `main` en GitHub, conservando `.streamlit/config.toml` y `assets/`. Si Streamlit Cloud mantiene una sesión antigua, usar `Manage app → Reboot app`. Confirmar `v0.6.1` en la barra lateral y en un PDF recién generado.
+Subir **todos los archivos de este ZIP** a la raíz de `main` en GitHub, conservando `.streamlit/config.toml` y `assets/`. Si Streamlit Cloud mantiene una sesión antigua, usar `Manage app → Reboot app`. Confirmar `v0.6.2` en la barra lateral y en un PDF recién generado.
 
 ## Comprobaciones sugeridas
 

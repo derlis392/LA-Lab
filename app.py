@@ -1,4 +1,4 @@
-"""LA-Lab v0.6.1 — Laboratorio abierto de Analítica del Aprendizaje."""
+"""LA-Lab v0.6.2 — Laboratorio abierto de Analítica del Aprendizaje."""
 import io
 import json
 from pathlib import Path
@@ -12,11 +12,13 @@ import streamlit as st
 st.set_page_config(page_title='LA-Lab | Analítica del Aprendizaje', page_icon='🎓', layout='wide')
 ROOT = Path(__file__).parent
 MAX_BYTES = 10 * 1024 * 1024
-# Catorce prácticas sobre tres fuentes originales; no son 14 datasets independientes.
+# Catorce prácticas basadas en cinco tablas originales de cuatro colecciones UCI.
 SOURCES = {
  'student_mat': {'name':'Student Performance — Matemáticas', 'uci_id':320, 'url':'https://archive.ics.uci.edu/dataset/320/student+performance', 'article':'Cortez, P. & Silva, A. (2008). Using Data Mining to Predict Secondary School Student Performance.', 'article_url':'', 'license':'CC BY 4.0', 'target':'G3'},
  'student_por': {'name':'Student Performance — Portugués', 'uci_id':320, 'url':'https://archive.ics.uci.edu/dataset/320/student+performance', 'article':'Cortez, P. & Silva, A. (2008). Using Data Mining to Predict Secondary School Student Performance.', 'article_url':'', 'license':'CC BY 4.0', 'target':'G3'},
  'dropout': {'name':'Predict Students Dropout and Academic Success', 'uci_id':697, 'url':'https://archive.ics.uci.edu/dataset/697/predict+students+dropout+and+academic+success', 'article':'Realinho, V., Machado, J., Baptista, L. & Martins, M. (2022). Predicting Student Dropout and Academic Success. Data, 7(11), 146.', 'article_url':'https://doi.org/10.3390/data7110146', 'license':'CC BY 4.0', 'target':'Target'},
+ 'mathe': {'name':'MathE — Evaluación de matemáticas en educación superior', 'uci_id':1031, 'url':'https://archive.ics.uci.edu/dataset/1031/dataset+for+assessing+mathematics+learning+in+higher+educa', 'article':'Azevedo, B. F., Pacheco, M. F., Fernandes, F. P. & Pereira, A. I. (2024). Dataset of mathematics learning and assessment of higher education students using the MathE platform. Data in Brief, 53, 110236.', 'article_url':'https://doi.org/10.1016/j.dib.2024.110236', 'license':'CC BY 4.0', 'target':'Type of Answer'},
+ 'higher_ed': {'name':'Higher Education Students Performance Evaluation', 'uci_id':856, 'url':'https://archive.ics.uci.edu/dataset/856/higher+education+students+performance+evaluation', 'article':'Yilmaz, N. & Şekeroğlu, B. (2019). Student Performance Classification Using Artificial Intelligence Techniques.', 'article_url':'https://doi.org/10.24432/C51G82', 'license':'CC BY 4.0', 'target':'GRADE'},
  'oulad': {'name':'Open University Learning Analytics Dataset (OULAD)', 'url':'https://analyse.kmi.open.ac.uk/open_dataset', 'article':'Kuzilek, J., Hlosta, M. & Zdrahal, Z. (2017). Open University Learning Analytics dataset. Scientific Data, 4, 170171.', 'article_url':'https://doi.org/10.1038/sdata.2017.171', 'license':'CC BY 4.0', 'target':'final_result'},
 }
 CASES = [
@@ -31,9 +33,9 @@ CASES = [
  ('Éxito académico','dropout','¿Qué patrones diferencian las categorías de resultado?','Target'),
  ('Clasificación multiclase','dropout','¿Cómo se comportan los clasificadores ante clases desbalanceadas?','Target'),
  ('Segmentación de perfiles','dropout','¿Qué grupos exploratorios se obtienen sin utilizar la etiqueta?','Target'),
- ('Progreso curricular y resultados','dropout','¿Cómo se relacionan las asignaturas aprobadas en el primer semestre con la trayectoria académica?','Target'),
- ('Desempeño entre semestres','dropout','¿Qué asociaciones existen entre las evaluaciones y unidades curriculares de ambos semestres y el resultado académico?','Target'),
- ('Factores de permanencia','dropout','¿Cómo se relacionan las condiciones de matrícula y los apoyos económicos con la trayectoria académica?','Target'),
+ ('Respuestas y dificultades en matemáticas','mathe','¿Cómo varía la proporción de respuestas correctas e incorrectas según el tema y el nivel de las preguntas?','Type of Answer'),
+ ('Hábitos de estudio y desempeño universitario','higher_ed','¿Qué asociaciones se observan entre hábitos de estudio, condiciones académicas y calificación final?','GRADE'),
+ ('Factores de permanencia universitaria','dropout','¿Cómo se relacionan las condiciones de matrícula y los apoyos económicos con la trayectoria académica?','Target'),
 ]
 
 @st.cache_data(show_spinner=False, ttl=86400)
@@ -60,7 +62,9 @@ def load_original(source_id):
             raise KeyError(f'No se encontró {filename} en el ZIP original.')
         return extract_csv(payload,'student-mat.csv' if source_id=='student_mat' else 'student-por.csv')
     ds = fetch_ucirepo(id=source['uci_id'])
-    df = pd.concat([ds.data.features.reset_index(drop=True),ds.data.targets.reset_index(drop=True)],axis=1)
+    frames = [part.reset_index(drop=True) for part in (ds.data.features, ds.data.targets) if isinstance(part, pd.DataFrame) and not part.empty]
+    if not frames: raise ValueError('La fuente no devolvió una tabla de datos.')
+    df = pd.concat(frames,axis=1)
     return df.loc[:,~df.columns.duplicated()].copy()
 
 
@@ -126,7 +130,7 @@ h1,h2,h3 {letter-spacing:-.02em}
 
 with st.sidebar:
     st.title('🎓 LA-Lab')
-    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.1')
+    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.2')
     mode = st.radio('Modalidad', ['Casos guiados','Datos propios'],key='mode')
     idx = None
     if mode == 'Casos guiados':
@@ -161,17 +165,17 @@ if mode=='Casos guiados':
         df_original = load_original(source_id)
         if idx >= 11:
             st.success('Práctica guiada cargada automáticamente desde la fuente UCI. No requiere subir archivos.')
-            st.caption('Los casos 12, 13 y 14 utilizan preguntas de investigación distintas sobre una misma fuente académica; no representan tres conjuntos independientes.')
+            st.caption('Los casos 12, 13 y 14 usan tres conjuntos originales diferentes: MathE (UCI 1031), Higher Education (UCI 856) y abandono universitario (UCI 697).')
             st.download_button('Descargar datos originales de esta práctica (.csv)', csv_bytes(df_original), f'la_lab_caso_{idx+1:02d}.csv', 'text/csv')
     except Exception as ex:
         df_original = None
         st.error('No fue posible obtener la fuente original: '+str(ex))
     if idx == 11:
-        st.caption('Variables recomendadas: Curricular units 1st sem (approved), Curricular units 1st sem (evaluations) y Target. Evita usar información posterior al periodo si deseas predicción temprana.')
+        st.caption('Variables recomendadas: Topic, Subtopic, Question Level y Type of Answer. Cada fila es una respuesta, no un estudiante independiente; evita Student ID y Question ID como predictores automáticos.')
     elif idx == 12:
-        st.caption('Variables recomendadas: Curricular units 1st sem (grade), Curricular units 2nd sem (grade) y Target. Este análisis es retrospectivo, no predicción temprana.')
+        st.caption('Explora las variables de hábitos de estudio y la calificación GRADE; el conjunto tiene 145 observaciones. Las columnas codificadas requieren consultar el diccionario de UCI.')
     elif idx == 13:
-        st.caption('Variables recomendadas: Tuition fees up to date, Scholarship holder, Age at enrollment y Target. Analiza asociaciones sin inferir causalidad.')
+        st.caption('Variables recomendadas: Tuition fees up to date, Scholarship holder, Age at enrollment y Target. Analiza asociaciones sin inferir causalidad; evita incluir datos posteriores a la matrícula en modelos de alerta temprana.')
     st.caption('FUENTE ORIGINAL: '+source['name']+' · '+source['license'])
     with st.expander('Ficha científica, artículo y descarga del conjunto original',expanded=True):
         st.write('**Pregunta:** '+question)
@@ -215,7 +219,7 @@ if page=='Inicio':
     a,b=st.columns(2)
     with a:
         st.subheader('📚 Laboratorio guiado')
-        st.write('14 prácticas sobre fuentes académicas originales, con preguntas de investigación y actividades orientadas a la analítica educativa.')
+        st.write('14 prácticas sobre cinco tablas originales de cuatro colecciones UCI, con preguntas de investigación y actividades orientadas a la analítica educativa.')
     with b:
         st.subheader('📂 Laboratorio libre')
         st.write('Carga CSV, TSV, TXT delimitado, Excel, JSON de registros o Parquet y analiza variables mediante controles gráficos.')
@@ -369,7 +373,7 @@ elif page=='6. Informe':
               'licencia':source.get('license','') if mode=='Casos guiados' else 'Verificar autorización del archivo',
               'reflexion':st.session_state.get('reflection','')}
     st.download_button('Descargar datos actuales (.csv)',csv_bytes(df),'datos_la_lab.csv','text/csv')
-    txt='LA-Lab v0.6.1 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
+    txt='LA-Lab v0.6.2 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
     st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v061.txt','text/plain')
     st.caption(f'Generador de informes cargado: {getattr(reporting, "REPORT_VERSION", "ANTIGUO")} · archivo: {Path(reporting.__file__).name}')
     try:
@@ -377,7 +381,7 @@ elif page=='6. Informe':
             st.error('VERSIONES INCOMPATIBLES: actualiza reporting.py junto con app.py en la raíz del repositorio y reinicia Streamlit. No se descargará un PDF antiguo.')
         else:
             pdf=build_pdf(df,metadata,ml,plot)
-            st.download_button('Descargar informe académico v0.6.1 (.pdf)',pdf,'informe_la_lab_v061.pdf','application/pdf')
+            st.download_button('Descargar informe académico v0.6.2 (.pdf)',pdf,'informe_la_lab_v061.pdf','application/pdf')
     except Exception as exc:
         st.error(f'No se pudo generar el PDF: {exc}')
     try:
@@ -607,4 +611,4 @@ elif page=='7. Minería de datos':
             st.error(f'No fue posible ejecutar el modelo: {ex}')
 
 st.divider()
-st.caption('LA-Lab v0.6.1 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
+st.caption('LA-Lab v0.6.2 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
