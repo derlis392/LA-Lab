@@ -1,4 +1,4 @@
-# LA-Lab v0.6.3 — dependencias para Streamlit Community Cloud (Python 3.11–3.13 recomendado)
+# LA-Lab v0.6.3.1 — dependencias para Streamlit Community Cloud (Python 3.11–3.13 recomendado)
 # MathE (UCI 1031) se descarga como ZIP original con urllib de la biblioteca estándar.
 # Se conserva ucimlrepo para las otras fuentes UCI y el límite global de carga en 10 MB.
 streamlit>=1.40,<2
