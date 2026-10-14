@@ -1,4 +1,4 @@
-"""LA-Lab v0.6.3.2 — Laboratorio abierto de Analítica del Aprendizaje."""
+"""LA-Lab v0.6.4 — Laboratorio abierto de Analítica del Aprendizaje."""
 import io
 import json
 import zipfile
@@ -115,25 +115,16 @@ def load_original(source_id):
             raise KeyError(f'No se encontró {filename} en el ZIP original.')
         return extract_csv(payload,'student-mat.csv' if source_id=='student_mat' else 'student-por.csv')
     if source_id == 'mathe':
-        # UCI 1031 is downloadable as a ZIP but is not supported by fetch_ucirepo.
-        # Try UCI's stable ID-based endpoint and its published slug endpoint.
-        endpoints = [
-            'https://archive.ics.uci.edu/static/public/1031.zip',
-            'https://archive.ics.uci.edu/static/public/1031/dataset+for+assessing+mathematics+learning+in+higher+educa.zip',
-            'https://archive.ics.uci.edu/static/public/1031/assessing+mathematics+learning+in+higher+education.zip',
-        ]
-        errors = []
-        for url in endpoints:
-            try:
-                request = urllib.request.Request(url, headers={'User-Agent': 'LA-Lab/0.6.3.2 (educational research)'})
-                with urllib.request.urlopen(request, timeout=30) as response:
-                    if int(response.headers.get('Content-Length', '0') or '0') > 45 * 1024 * 1024:
-                        raise ValueError('Archivo comprimido demasiado grande.')
-                    payload = response.read(45 * 1024 * 1024 + 1)
-                return _read_mathe_archive(payload)
-            except (OSError, ValueError, zipfile.BadZipFile) as ex:
-                errors.append(f'{type(ex).__name__}: {str(ex)[:100]}')
-        raise ValueError('No se pudo descargar MathE desde UCI. Usa el enlace de la ficha científica y carga el CSV original desde Datos propios. Detalle: ' + '; '.join(errors))
+        # Copia fiel del CSV original MathE, provisto desde el archivo UCI por el usuario.
+        # No depende de URL externas ni del límite de carga del laboratorio libre.
+        csv_path = ROOT / 'data' / 'mathe_original.csv'
+        if not csv_path.is_file():
+            raise FileNotFoundError('Falta data/mathe_original.csv en el repositorio. Sube el paquete completo.')
+        frame = pd.read_csv(csv_path, encoding='utf-8', low_memory=False)
+        expected = {'Student ID', 'Student Country', 'Question ID', 'Type of Answer', 'Question Level', 'Topic', 'Subtopic', 'Keywords'}
+        if not expected.issubset(frame.columns) or len(frame) != 9546:
+            raise ValueError('El archivo MathE local no coincide con el conjunto original verificado (9546 registros, 8 variables).')
+        return frame
     ds = fetch_ucirepo(id=source['uci_id'])
     frames = [part.reset_index(drop=True) for part in (ds.data.features, ds.data.targets) if isinstance(part, pd.DataFrame) and not part.empty]
     if not frames: raise ValueError('La fuente no devolvió una tabla de datos.')
@@ -203,7 +194,7 @@ h1,h2,h3 {letter-spacing:-.02em}
 
 with st.sidebar:
     st.title('🎓 LA-Lab')
-    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.3.2')
+    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.4')
     mode = st.radio('Modalidad', ['Casos guiados','Datos propios'],key='mode')
     idx = None
     if mode == 'Casos guiados':
@@ -237,14 +228,14 @@ if mode=='Casos guiados':
     try:
         df_original = load_original(source_id)
         if idx >= 11:
-            st.success('Práctica guiada cargada automáticamente desde la fuente UCI. No requiere subir archivos.')
+            st.success('Práctica guiada cargada automáticamente con datos originales de UCI. No requiere subir archivos.')
             st.caption('Los casos 12, 13 y 14 usan tres conjuntos originales diferentes: MathE (UCI 1031), Higher Education (UCI 856) y abandono universitario (UCI 697).')
             st.download_button('Descargar datos originales de esta práctica (.csv)', csv_bytes(df_original), f'la_lab_caso_{idx+1:02d}.csv', 'text/csv')
     except Exception as ex:
         df_original = None
         st.error('No fue posible obtener la fuente original: '+str(ex))
         if source_id == 'mathe':
-            st.info('MathE no admite fetch_ucirepo. LA-Lab intenta descargar su ZIP oficial; si la red o la fuente falla, descarga el archivo desde la ficha y súbelo mediante Datos propios (máximo 10 MB).')
+            st.info('El caso 12 utiliza el archivo original incluido en data/mathe_original.csv. Verifica que esa carpeta se haya subido a GitHub.')
     if idx == 11:
         st.caption('Variables recomendadas: Topic, Subtopic, Question Level y Type of Answer. Cada fila es una respuesta, no un estudiante independiente; evita Student ID y Question ID como predictores automáticos.')
     elif idx == 12:
@@ -448,7 +439,7 @@ elif page=='6. Informe':
               'licencia':source.get('license','') if mode=='Casos guiados' else 'Verificar autorización del archivo',
               'reflexion':st.session_state.get('reflection','')}
     st.download_button('Descargar datos actuales (.csv)',csv_bytes(df),'datos_la_lab.csv','text/csv')
-    txt='LA-Lab v0.6.3.2 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
+    txt='LA-Lab v0.6.4 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
     st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v061.txt','text/plain')
     st.caption(f'Generador de informes cargado: {getattr(reporting, "REPORT_VERSION", "ANTIGUO")} · archivo: {Path(reporting.__file__).name}')
     try:
@@ -456,7 +447,7 @@ elif page=='6. Informe':
             st.error('VERSIONES INCOMPATIBLES: actualiza reporting.py junto con app.py en la raíz del repositorio y reinicia Streamlit. No se descargará un PDF antiguo.')
         else:
             pdf=build_pdf(df,metadata,ml,plot)
-            st.download_button('Descargar informe académico v0.6.3.2 (.pdf)',pdf,'informe_la_lab_v0632.pdf','application/pdf')
+            st.download_button('Descargar informe académico v0.6.4 (.pdf)',pdf,'informe_la_lab_v064.pdf','application/pdf')
     except Exception as exc:
         st.error(f'No se pudo generar el PDF: {exc}')
     try:

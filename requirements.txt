@@ -1,6 +1,6 @@
-# LA-Lab v0.6.3.2 — dependencias para Streamlit Community Cloud (Python 3.11–3.13 recomendado)
-# MathE (UCI 1031) se descarga como ZIP original con urllib de la biblioteca estándar.
-# Se conserva ucimlrepo para las otras fuentes UCI y el límite global de carga en 10 MB.
+# LA-Lab v0.6.4 — dependencias para Streamlit Community Cloud (Python 3.11–3.13 recomendado)
+# MathE se incluye en data/mathe_original.csv (CSV original UCI convertido a UTF-8).
+# ucimlrepo permanece para otras fuentes; carga libre limitada a 10 MB.
 streamlit>=1.40,<2
 pandas>=2.2,<3
 numpy>=1.26,<3
