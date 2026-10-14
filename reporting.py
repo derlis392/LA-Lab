@@ -1,5 +1,5 @@
 """LA-Lab: reportes reproducibles y narrativas cautelosas para educación."""
-REPORT_VERSION = "0.5.6"
+REPORT_VERSION = "0.6"
 import io
 from datetime import datetime
 from xml.sax.saxutils import escape
@@ -192,7 +192,7 @@ def build_pdf(df,meta,ml=None,plot=None):
     if logo_cells:
         logo_table=Table([[logo_cells[0],logo_cells[1]]] if len(logo_cells)==2 else [logo_cells],hAlign='LEFT',colWidths=[3*cm,12*cm] if len(logo_cells)==2 else None)
         story.append(logo_table);story.append(Spacer(1,12))
-    story.append(Paragraph('LA-Lab v0.5.6 | Informe académico de analítica del aprendizaje',styles['LabTitle']))
+    story.append(Paragraph('LA-Lab v0.6 | Informe académico de analítica del aprendizaje',styles['LabTitle']))
     para('Caso: '+meta['caso']);para('Generado: '+datetime.now().strftime('%Y-%m-%d %H:%M')+' | Documento exploratorio; revisión humana requerida')
     heading('1. Propósito y procedencia')
     para('Pregunta de investigación del caso: '+meta['pregunta']);para('Fuente: '+meta['fuente']);para('Licencia declarada: '+meta['licencia'])
@@ -226,7 +226,9 @@ def build_pdf(df,meta,ml=None,plot=None):
         if ml.get('porcentaje_prueba'):
             para('Partición de prueba: '+str(ml['porcentaje_prueba'])+' %. Entrenamiento: '+str(ml.get('n_entrenamiento','no registrado'))+'; prueba: '+str(ml.get('n_prueba','no registrado'))+'.')
             para('Preprocesamiento interno del modelo: '+str(ml.get('preprocesamiento_interno','Pipeline de imputación/codificación/escalado, ajustado exclusivamente sobre entrenamiento.')))
-        table([['Métrica','Resultado']]+[[str(k),f'{v:.3f}' if isinstance(v,(int,float)) else str(v)] for k,v in ml.get('metricas',{}).items()])
+        metric_rows=[['Métrica','Resultado']]+[[str(k),f'{v:.3f}' if isinstance(v,(int,float)) else str(v)] for k,v in ml.get('metricas',{}).items()]
+        story.append(CondPageBreak(min(7.5*cm, (len(metric_rows)+1)*0.75*cm)))
+        table(metric_rows)
         if ml['tarea']=='Agrupamiento' and ml.get('perfiles'):
             rows=ml['perfiles']; columns=list(rows[0])[:6]
             table([columns]+[[f'{v:.2f}' if isinstance(v,(int,float)) else str(v) for v in [row[k] for k in columns]] for row in rows])
@@ -274,7 +276,7 @@ def build_pdf(df,meta,ml=None,plot=None):
         except importlib.metadata.PackageNotFoundError:pass
     para('Entorno: Python '+platform.python_version()+'; '+ '; '.join(versions)+'. Versión de LA-Lab: '+REPORT_VERSION+'.')
     def footer(canvas,doc):
-        canvas.setFont('Helvetica',8);canvas.setFillColor(colors.grey);canvas.drawString(1.8*cm,1.1*cm,'LA-Lab v0.5.6 · Informe exploratorio · No tomar decisiones automatizadas sobre estudiantes');canvas.drawRightString(19.2*cm,1.1*cm,str(doc.page))
+        canvas.setFont('Helvetica',8);canvas.setFillColor(colors.grey);canvas.drawString(1.8*cm,1.1*cm,'LA-Lab v0.6 · Informe exploratorio · No tomar decisiones automatizadas sobre estudiantes');canvas.drawRightString(19.2*cm,1.1*cm,str(doc.page))
     doc.build(story,onFirstPage=footer,onLaterPages=footer);return buf.getvalue()
 
 

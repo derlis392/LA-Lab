@@ -1,8 +1,9 @@
-"""LA-Lab v0.5.6 — Laboratorio abierto de Analítica del Aprendizaje."""
+"""LA-Lab v0.6 — Laboratorio abierto de Analítica del Aprendizaje."""
 import io
 import json
 from pathlib import Path
 import reporting
+from oulad import prepare_oulad
 from reporting import build_pdf, build_excel, explain_ml, describe_data, summarize_plot
 import numpy as np
 import pandas as pd
@@ -42,7 +43,7 @@ def load_original(source_id):
     from ucimlrepo import fetch_ucirepo
     source = SOURCES[source_id]
     if source_id == 'oulad':
-        raise ValueError('OULAD requiere descargar y preparar sus tablas originales. Utiliza la modalidad Datos propios para cargar una tabla CSV original; el enlace oficial está en la ficha del caso.')
+        raise ValueError('Para OULAD, carga el archivo ZIP original mediante el panel del caso.')
     if source_id.startswith('student_'):
         import urllib.request, zipfile
         url='https://archive.ics.uci.edu/static/public/320/student+performance.zip'
@@ -128,7 +129,7 @@ h1,h2,h3 {letter-spacing:-.02em}
 
 with st.sidebar:
     st.title('🎓 LA-Lab')
-    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.5.6')
+    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6')
     mode = st.radio('Modalidad', ['Casos guiados','Datos propios'],key='mode')
     idx = None
     if mode == 'Casos guiados':
@@ -159,11 +160,35 @@ if mode=='Casos guiados':
     title, source_id, question, suggested_target = CASES[idx]
     source = SOURCES[source_id]
     description = source['name']
-    try:
-        df_original = load_original(source_id)
-    except Exception as ex:
+    if source_id == 'oulad':
+        st.info('OULAD consta de varias tablas relacionadas. Descarga el ZIP original desde la ficha científica y cárgalo aquí. LA-Lab preparará automáticamente las tablas necesarias para esta práctica, sin inventar datos.')
+        st.caption('Caso 12: studentInfo + studentVle (clics agregados por estudiante y presentación). Caso 13: studentInfo + studentAssessment + assessments. Caso 14: studentInfo + studentRegistration.')
+        oulad_zip = st.file_uploader('Archivo ZIP original OULAD (hasta 200 MB)', type=['zip'], key='oulad_zip')
         df_original = None
-        st.info(str(ex))
+        if oulad_zip is not None:
+            fingerprint = (idx, oulad_zip.name, oulad_zip.size, oulad_zip.getvalue()[:256])
+            if st.session_state.get('oulad_fingerprint') != fingerprint:
+                if st.button('Preparar datos reales del caso OULAD', type='primary'):
+                    try:
+                        with st.spinner('Combinando tablas originales; studentVle se procesa por bloques...'):
+                            prepared = prepare_oulad(oulad_zip.getvalue(), idx+1)
+                        st.session_state.oulad_prepared = prepared
+                        st.session_state.oulad_fingerprint = fingerprint
+                        st.success(f'Tablas originales procesadas: {len(prepared):,} registros.')
+                        st.rerun()
+                    except Exception as ex:
+                        st.error('No se pudo preparar OULAD: ' + str(ex))
+            else:
+                df_original = st.session_state.get('oulad_prepared')
+                if df_original is not None:
+                    st.success(f'Caso OULAD preparado: {len(df_original):,} registros y {len(df_original.columns)} variables.')
+                    st.download_button('Descargar tabla OULAD integrada (.csv)', df_original.to_csv(index=False).encode('utf-8-sig'), f'oulad_caso_{idx+1}.csv', 'text/csv')
+    else:
+        try:
+            df_original = load_original(source_id)
+        except Exception as ex:
+            df_original = None
+            st.error('No fue posible obtener la fuente original: '+str(ex))
     st.caption('FUENTE ORIGINAL: '+source['name']+' · '+source['license'])
     with st.expander('Ficha científica, artículo y descarga del conjunto original',expanded=True):
         st.write('**Pregunta:** '+question)
@@ -190,7 +215,7 @@ else:
     title, description, question = 'Datos propios','Archivo proporcionado por el usuario','¿Qué información puede obtenerse de estas variables?'
     suggested_target = None
 
-source_key = f'{mode}-{idx if idx is not None else ""}-{upload.name if mode=="Datos propios" and upload else ""}-{upload.size if mode=="Datos propios" and upload else ""}'
+source_key = f'{mode}-{idx if idx is not None else ""}-{upload.name if mode=="Datos propios" and upload else ""}-{upload.size if mode=="Datos propios" and upload else ""}-{st.session_state.get("oulad_fingerprint") if mode=="Casos guiados" and source_id=="oulad" else ""}'
 if st.session_state.get('source_key')!=source_key:
     st.session_state.source_key=source_key
     st.session_state.cleaned=None
@@ -212,10 +237,10 @@ if page=='Inicio':
         st.subheader('📂 Laboratorio libre')
         st.write('Carga CSV, TSV, TXT delimitado, Excel, JSON de registros o Parquet y analiza variables mediante controles gráficos.')
     st.markdown('##### Procedencia y alcance')
-    st.info('Los 14 casos son **prácticas sobre tres colecciones de datos reales**. UCI se consulta desde sus fuentes oficiales; OULAD requiere descarga y preparación manual. Los artículos citados no constituyen una validación automática de los resultados obtenidos aquí.')
+    st.info('Los 14 casos son **prácticas sobre tres colecciones de datos reales**. UCI se consulta desde sus fuentes oficiales; OULAD se prepara automáticamente al cargar su ZIP original. Los artículos citados no constituyen una validación automática de los resultados obtenidos aquí.')
     st.markdown('##### Fuentes abiertas para ampliar el laboratorio')
     st.markdown('- [Open University Learning Analytics Dataset (OULAD)](https://analyse.kmi.open.ac.uk/open_dataset) — datos reales de cursos y actividad virtual, CC BY 4.0.\n- [Student Performance (UCI)](https://doi.org/10.24432/C5TG7T) — desempeño académico de secundaria, CC BY 4.0.\n- [Predict Students’ Dropout and Academic Success (UCI)](https://archive.ics.uci.edu/dataset/697/predict+students+dropout+and+academic+success) — trayectoria y resultados de educación superior; consultar condiciones antes de reutilizar.')
-    st.caption('Los casos UCI se descargan de la fuente original cuando el servidor tiene acceso. OULAD requiere descargar y preparar sus tablas oficiales. No se generan datos ficticios como sustitutos.')
+    st.caption('Los casos UCI se descargan de la fuente original cuando el servidor tiene acceso. OULAD requiere cargar el ZIP original y LA-Lab integra sus tablas por práctica. No se generan datos ficticios como sustitutos.')
 elif df is None:
     st.info('Carga primero un archivo desde el panel izquierdo para comenzar.')
 elif page=='1. Datos':
@@ -361,20 +386,20 @@ elif page=='6. Informe':
               'licencia':source.get('license','') if mode=='Casos guiados' else 'Verificar autorización del archivo',
               'reflexion':st.session_state.get('reflection','')}
     st.download_button('Descargar datos actuales (.csv)',csv_bytes(df),'datos_la_lab.csv','text/csv')
-    txt='LA-Lab v0.5.6 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
-    st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v056.txt','text/plain')
+    txt='LA-Lab v0.6 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
+    st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v06.txt','text/plain')
     st.caption(f'Generador de informes cargado: {getattr(reporting, "REPORT_VERSION", "ANTIGUO")} · archivo: {Path(reporting.__file__).name}')
     try:
-        if getattr(reporting, 'REPORT_VERSION', None) != '0.5.6':
+        if getattr(reporting, 'REPORT_VERSION', None) != '0.6':
             st.error('VERSIONES INCOMPATIBLES: actualiza reporting.py junto con app.py en la raíz del repositorio y reinicia Streamlit. No se descargará un PDF antiguo.')
         else:
             pdf=build_pdf(df,metadata,ml,plot)
-            st.download_button('Descargar informe académico v0.5.6 (.pdf)',pdf,'informe_la_lab_v056.pdf','application/pdf')
+            st.download_button('Descargar informe académico v0.6 (.pdf)',pdf,'informe_la_lab_v06.pdf','application/pdf')
     except Exception as exc:
         st.error(f'No se pudo generar el PDF: {exc}')
     try:
         xlsx=build_excel(df,metadata,ml)
-        st.download_button('Descargar libro de análisis (.xlsx)',xlsx,'analisis_la_lab_v056.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        st.download_button('Descargar libro de análisis (.xlsx)',xlsx,'analisis_la_lab_v06.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     except Exception as exc:
         st.error(f'No se pudo generar el Excel: {exc}')
     text_box('El informe incorpora análisis registrados, visualizaciones reproducibles, interpretación y sugerencias condicionadas. Las recomendaciones requieren revisión humana y no constituyen diagnóstico individual.')
@@ -599,4 +624,4 @@ elif page=='7. Minería de datos':
             st.error(f'No fue posible ejecutar el modelo: {ex}')
 
 st.divider()
-st.caption('LA-Lab v0.5.6 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
+st.caption('LA-Lab v0.6 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
