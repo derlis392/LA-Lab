@@ -1,6 +1,8 @@
-"""LA-Lab v0.6.2 — Laboratorio abierto de Analítica del Aprendizaje."""
+"""LA-Lab v0.6.3 — Laboratorio abierto de Analítica del Aprendizaje."""
 import io
 import json
+import zipfile
+import urllib.request
 from pathlib import Path
 import reporting
 from reporting import build_pdf, build_excel, explain_ml, describe_data, summarize_plot
@@ -38,6 +40,58 @@ CASES = [
  ('Factores de permanencia universitaria','dropout','¿Cómo se relacionan las condiciones de matrícula y los apoyos económicos con la trayectoria académica?','Target'),
 ]
 
+def _read_mathe_archive(payload):
+    """Read the actual MathE table from the original UCI archive, not an invented dataset."""
+    if len(payload) > 45 * 1024 * 1024:
+        raise ValueError('El archivo de origen excede el límite de seguridad de 45 MB comprimidos.')
+    candidates = []
+    def visit(data, depth=0):
+        if depth > 2:
+            return
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            for member in archive.infolist():
+                name = member.filename
+                if member.is_dir() or name.startswith('__MACOSX/') or '/.' in name:
+                    continue
+                if member.file_size > 90 * 1024 * 1024:
+                    continue
+                suffix = Path(name).suffix.lower()
+                if suffix not in ('.csv', '.xlsx', '.xls', '.zip'):
+                    continue
+                raw = archive.read(member)
+                if suffix == '.zip':
+                    try:
+                        visit(raw, depth + 1)
+                    except (ValueError, zipfile.BadZipFile):
+                        continue
+                else:
+                    try:
+                        if suffix in ('.xlsx', '.xls'):
+                            frame = pd.read_excel(io.BytesIO(raw))
+                        else:
+                            frame = None
+                            for sep in (',', ';', '\t'):
+                                for encoding in ('utf-8-sig', 'latin-1'):
+                                    try:
+                                        trial = pd.read_csv(io.BytesIO(raw), sep=sep, encoding=encoding, low_memory=False)
+                                        if trial.shape[1] >= 3:
+                                            frame = trial
+                                            break
+                                    except (UnicodeError, pd.errors.ParserError):
+                                        continue
+                                if frame is not None:
+                                    break
+                        if frame is not None and len(frame) >= 50 and frame.shape[1] >= 3:
+                            score = (int(any('answer' in str(c).lower() for c in frame.columns)), len(frame))
+                            candidates.append((score, frame))
+                    except (ValueError, ImportError, OSError, pd.errors.ParserError):
+                        continue
+    visit(payload)
+    if not candidates:
+        raise ValueError('El ZIP descargado no contiene una tabla MathE reconocible (CSV o Excel).')
+    return max(candidates, key=lambda item: item[0])[1].reset_index(drop=True)
+
+
 @st.cache_data(show_spinner=False, ttl=86400)
 def load_original(source_id):
     # Descarga bajo demanda en el servidor Streamlit; nunca se sustituyen datos reales por sintéticos.
@@ -61,6 +115,26 @@ def load_original(source_id):
                             except (KeyError,ValueError,zipfile.BadZipFile): pass
             raise KeyError(f'No se encontró {filename} en el ZIP original.')
         return extract_csv(payload,'student-mat.csv' if source_id=='student_mat' else 'student-por.csv')
+    if source_id == 'mathe':
+        # UCI 1031 is downloadable as a ZIP but is not supported by fetch_ucirepo.
+        # Try UCI's stable ID-based endpoint and its published slug endpoint.
+        endpoints = [
+            'https://archive.ics.uci.edu/static/public/1031.zip',
+            'https://archive.ics.uci.edu/static/public/1031/dataset+for+assessing+mathematics+learning+in+higher+educa.zip',
+            'https://archive.ics.uci.edu/static/public/1031/assessing+mathematics+learning+in+higher+education.zip',
+        ]
+        errors = []
+        for url in endpoints:
+            try:
+                request = urllib.request.Request(url, headers={'User-Agent': 'LA-Lab/0.6.3 (educational research)'})
+                with urllib.request.urlopen(request, timeout=30) as response:
+                    if int(response.headers.get('Content-Length', '0') or '0') > 45 * 1024 * 1024:
+                        raise ValueError('Archivo comprimido demasiado grande.')
+                    payload = response.read(45 * 1024 * 1024 + 1)
+                return _read_mathe_archive(payload)
+            except (OSError, ValueError, zipfile.BadZipFile) as ex:
+                errors.append(f'{type(ex).__name__}: {str(ex)[:100]}')
+        raise ValueError('No se pudo descargar MathE desde UCI. Usa el enlace de la ficha científica y carga el CSV original desde Datos propios. Detalle: ' + '; '.join(errors))
     ds = fetch_ucirepo(id=source['uci_id'])
     frames = [part.reset_index(drop=True) for part in (ds.data.features, ds.data.targets) if isinstance(part, pd.DataFrame) and not part.empty]
     if not frames: raise ValueError('La fuente no devolvió una tabla de datos.')
@@ -130,7 +204,7 @@ h1,h2,h3 {letter-spacing:-.02em}
 
 with st.sidebar:
     st.title('🎓 LA-Lab')
-    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.2')
+    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.3')
     mode = st.radio('Modalidad', ['Casos guiados','Datos propios'],key='mode')
     idx = None
     if mode == 'Casos guiados':
@@ -170,6 +244,8 @@ if mode=='Casos guiados':
     except Exception as ex:
         df_original = None
         st.error('No fue posible obtener la fuente original: '+str(ex))
+        if source_id == 'mathe':
+            st.info('MathE no admite fetch_ucirepo. LA-Lab intenta descargar su ZIP oficial; si la red o la fuente falla, descarga el archivo desde la ficha y súbelo mediante Datos propios (máximo 10 MB).')
     if idx == 11:
         st.caption('Variables recomendadas: Topic, Subtopic, Question Level y Type of Answer. Cada fila es una respuesta, no un estudiante independiente; evita Student ID y Question ID como predictores automáticos.')
     elif idx == 12:
@@ -373,7 +449,7 @@ elif page=='6. Informe':
               'licencia':source.get('license','') if mode=='Casos guiados' else 'Verificar autorización del archivo',
               'reflexion':st.session_state.get('reflection','')}
     st.download_button('Descargar datos actuales (.csv)',csv_bytes(df),'datos_la_lab.csv','text/csv')
-    txt='LA-Lab v0.6.2 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
+    txt='LA-Lab v0.6.3 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
     st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v061.txt','text/plain')
     st.caption(f'Generador de informes cargado: {getattr(reporting, "REPORT_VERSION", "ANTIGUO")} · archivo: {Path(reporting.__file__).name}')
     try:
@@ -381,7 +457,7 @@ elif page=='6. Informe':
             st.error('VERSIONES INCOMPATIBLES: actualiza reporting.py junto con app.py en la raíz del repositorio y reinicia Streamlit. No se descargará un PDF antiguo.')
         else:
             pdf=build_pdf(df,metadata,ml,plot)
-            st.download_button('Descargar informe académico v0.6.2 (.pdf)',pdf,'informe_la_lab_v061.pdf','application/pdf')
+            st.download_button('Descargar informe académico v0.6.3 (.pdf)',pdf,'informe_la_lab_v061.pdf','application/pdf')
     except Exception as exc:
         st.error(f'No se pudo generar el PDF: {exc}')
     try:
@@ -611,4 +687,4 @@ elif page=='7. Minería de datos':
             st.error(f'No fue posible ejecutar el modelo: {ex}')
 
 st.divider()
-st.caption('LA-Lab v0.6.2 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
+st.caption('LA-Lab v0.6.3 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
