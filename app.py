@@ -1,7 +1,8 @@
-"""LA-Lab v0.4 — Laboratorio abierto de Analítica del Aprendizaje."""
+"""LA-Lab v0.5 — Laboratorio abierto de Analítica del Aprendizaje."""
 import io
 import json
 from pathlib import Path
+from reporting import build_pdf, build_excel, explain_ml, describe_data, summarize_plot
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -12,8 +13,8 @@ ROOT = Path(__file__).parent
 MAX_BYTES = 10 * 1024 * 1024
 # Catorce prácticas sobre tres fuentes originales; no son 14 datasets independientes.
 SOURCES = {
- 'student_mat': {'name':'Student Performance — Matemáticas', 'uci_id':320, 'url':'https://archive.ics.uci.edu/dataset/320/student+performance', 'article':'Cortez, P. & Silva, A. (2008). Using Data Mining to Predict Secondary School Student Performance.', 'article_url':'https://www.openml.org/search?type=data&id=42352', 'license':'CC BY 4.0', 'target':'G3'},
- 'student_por': {'name':'Student Performance — Portugués', 'uci_id':320, 'url':'https://archive.ics.uci.edu/dataset/320/student+performance', 'article':'Cortez, P. & Silva, A. (2008). Using Data Mining to Predict Secondary School Student Performance.', 'article_url':'https://www.openml.org/search?type=data&id=42352', 'license':'CC BY 4.0', 'target':'G3'},
+ 'student_mat': {'name':'Student Performance — Matemáticas', 'uci_id':320, 'url':'https://archive.ics.uci.edu/dataset/320/student+performance', 'article':'Cortez, P. & Silva, A. (2008). Using Data Mining to Predict Secondary School Student Performance.', 'article_url':'https://archive.ics.uci.edu/dataset/320/student+performance', 'license':'CC BY 4.0', 'target':'G3'},
+ 'student_por': {'name':'Student Performance — Portugués', 'uci_id':320, 'url':'https://archive.ics.uci.edu/dataset/320/student+performance', 'article':'Cortez, P. & Silva, A. (2008). Using Data Mining to Predict Secondary School Student Performance.', 'article_url':'https://archive.ics.uci.edu/dataset/320/student+performance', 'license':'CC BY 4.0', 'target':'G3'},
  'dropout': {'name':'Predict Students Dropout and Academic Success', 'uci_id':697, 'url':'https://archive.ics.uci.edu/dataset/697/predict+students+dropout+and+academic+success', 'article':'Realinho, V., Machado, J., Baptista, L. & Martins, M. (2022). Predicting Student Dropout and Academic Success. Data, 7(11), 146.', 'article_url':'https://doi.org/10.3390/data7110146', 'license':'CC BY 4.0', 'target':'Target'},
  'oulad': {'name':'Open University Learning Analytics Dataset (OULAD)', 'url':'https://analyse.kmi.open.ac.uk/open_dataset', 'article':'Kuzilek, J., Hlosta, M. & Zdrahal, Z. (2017). Open University Learning Analytics dataset. Scientific Data, 4, 170171.', 'article_url':'https://doi.org/10.1038/sdata.2017.171', 'license':'CC BY 4.0', 'target':'final_result'},
 }
@@ -126,7 +127,7 @@ h1,h2,h3 {letter-spacing:-.02em}
 
 with st.sidebar:
     st.title('🎓 LA-Lab')
-    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.4')
+    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.5')
     mode = st.radio('Modalidad', ['Casos guiados','Datos propios'],key='mode')
     idx = None
     if mode == 'Casos guiados':
@@ -190,6 +191,8 @@ if st.session_state.get('source_key')!=source_key:
     st.session_state.last_cleaning='No se han aplicado transformaciones.'
     st.session_state.ml_summary='Sin modelo entrenado.'
     st.session_state.plot_summary='Sin gráfico analizado.'
+    st.session_state.ml_payload=None
+    st.session_state.plot_payload=None
 df = st.session_state.cleaned if st.session_state.cleaned is not None else df_original
 
 if page=='Inicio':
@@ -239,11 +242,15 @@ elif page=='2. Limpieza':
                     value=valid.median() if pd.api.types.is_numeric_dtype(cleaned[c]) else valid.mode().iloc[0]
                     cleaned[c]=cleaned[c].fillna(value)
         st.session_state.cleaned=cleaned
+        st.session_state.ml_payload=None
+        st.session_state.plot_payload=None
         st.session_state.last_cleaning=f'Filas antes: {before}; después: {len(cleaned)}. Duplicados: {remove}. Faltantes: {missing}.'
         st.success(st.session_state.get('last_cleaning','Sin operaciones registradas'))
         st.rerun()
     if st.button('Restablecer datos originales'):
         st.session_state.cleaned=None
+        st.session_state.ml_payload=None
+        st.session_state.plot_payload=None
         st.session_state.last_cleaning='Datos originales restablecidos.'
         st.rerun()
     st.download_button('Descargar tabla actual (CSV)',csv_bytes(df),'la_lab_datos_limpios.csv','text/csv')
@@ -263,7 +270,8 @@ elif page=='3. Indicadores':
     if 'entregas' in df and pd.api.types.is_numeric_dtype(df['entregas']):
         st.metric('Promedio de entregas registradas',f'{df["entregas"].mean():.2f}')
         st.caption('Cantidad promedio, no porcentaje de cumplimiento salvo que se conozca el total esperado.')
-    text_box(summarize_numeric(df[var])+' Estas cifras describen la muestra; su relevancia educativa depende de la escala, el periodo y el contexto.')
+    st.caption('Media: tendencia central; mediana: valor intermedio; desviación estándar: variabilidad. Revisa si la variable representa cantidad, categoría codificada o escala ordinal.')
+    text_box(summarize_numeric(df[var])+' Estas cifras describen la muestra; su relevancia educativa depende de la escala, el periodo y el contexto. No confundir correlación con causalidad ni frecuencia de actividad con aprendizaje.')
 elif page=='4. Visualización':
     st.header('4. Visualización exploratoria')
     numeric=df.select_dtypes(include='number').columns.tolist()
@@ -273,6 +281,8 @@ elif page=='4. Visualización':
     if kind=='Histograma' and numeric:
         x=st.selectbox('Variable',numeric); fig=px.histogram(df,x=x,nbins=25)
         st.plotly_chart(fig,use_container_width=True)
+        st.session_state.plot_summary=f'Distribución de {x}'
+        st.session_state.plot_payload={'tipo':'histograma','x':x}
         text_box(f'El histograma muestra la distribución de **{x}**. {summarize_numeric(df[x])} Examina concentración, asimetría y posibles valores extremos.')
     elif kind=='Diagrama de dispersión' and len(numeric)>=2:
         x=st.selectbox('Eje X',numeric); y=st.selectbox('Eje Y',[c for c in numeric if c!=x]); fig=px.scatter(df,x=x,y=y,opacity=.7)
@@ -281,28 +291,34 @@ elif page=='4. Visualización':
         r=pair[x].corr(pair[y]) if len(pair)>2 and pair[x].nunique()>1 and pair[y].nunique()>1 else np.nan
         msg=f'La correlación de Pearson entre **{x}** y **{y}** es **{r:.2f}**.' if pd.notna(r) else 'No es posible calcular una correlación válida.'
         st.session_state.plot_summary=msg
+        st.session_state.plot_payload={'tipo':'dispersion','x':x,'y':y}
         text_box(msg+' La asociación no demuestra causalidad; evalúa valores extremos, linealidad y posibles factores de confusión.')
     elif kind=='Diagrama de caja' and numeric:
         y=st.selectbox('Variable',numeric); group=st.selectbox('Agrupar por (opcional)',['Sin grupos']+cats)
         fig=px.box(df,y=y,x=group if group!='Sin grupos' else None)
         st.plotly_chart(fig,use_container_width=True)
+        st.session_state.plot_summary=f'Diagrama de caja de {y} por {group}'
+        st.session_state.plot_payload={'tipo':'caja','y':y,'grupo':group}
         text_box(f'El diagrama de caja permite comparar medianas, dispersión y observaciones extremas de **{y}**'+(f' por **{group}**.' if group!='Sin grupos' else '.')+' Las diferencias descriptivas no implican efectos causales.')
     elif kind=='Frecuencia de categorías' and cats:
         x=st.selectbox('Variable categórica',cats)
         counts=df[x].astype('string').fillna('(Faltante)').value_counts().head(20).rename_axis(x).reset_index(name='frecuencia')
         st.plotly_chart(px.bar(counts,x=x,y='frecuencia'),use_container_width=True)
+        st.session_state.plot_summary=f'Frecuencias de {x}'
+        st.session_state.plot_payload={'tipo':'categorias','x':x}
         text_box(f'La categoría más frecuente de **{x}** es **{counts.iloc[0,0]}**, con **{counts.iloc[0,1]} registros**. Se muestran como máximo 20 categorías.')
     elif kind=='Matriz de correlación' and len(numeric)>=2:
         corr=df[numeric].corr(numeric_only=True)
         st.plotly_chart(px.imshow(corr,text_auto='.2f',zmin=-1,zmax=1,color_continuous_scale='RdBu_r'),use_container_width=True)
         st.session_state.plot_summary='Matriz de correlación calculada para '+str(len(numeric))+' variables numéricas.'
+        st.session_state.plot_payload={'tipo':'correlacion','columnas':numeric[:15]}
         text_box('La matriz muestra asociaciones lineales entre variables numéricas. Correlaciones elevadas pueden reflejar variables redundantes, relaciones mecánicas o patrones que requieren investigación adicional.')
     else:
         st.warning('El archivo no tiene suficientes variables compatibles con este tipo de gráfico.')
 elif page=='5. Interpretación':
     st.header('5. Interpretación y decisiones educativas')
     st.write('**Pregunta orientadora:** '+question)
-    text_box(interpret_dataset(df))
+    text_box(describe_data(df,question,suggested_target)+'\n\n'+summarize_plot(df,st.session_state.get('plot_payload'))+'\n\n'+explain_ml(st.session_state.get('ml_payload')))
     st.write('**Actividad de reflexión**')
     choice=st.radio('¿Qué conclusión es metodológicamente adecuada?', ['Selecciona una respuesta','Las correlaciones demuestran que una variable causa otra.','Los patrones son descriptivos y requieren contraste contextual.','Una variable de accesos mide directamente el aprendizaje.'])
     if st.button('Verificar respuesta'):
@@ -314,44 +330,44 @@ elif page=='5. Interpretación':
     if st.session_state.get('reflection'):
         st.download_button('Descargar reflexión (.txt)',st.session_state.reflection,'reflexion_la_lab.txt','text/plain')
 elif page=='6. Informe':
-    st.header('6. Informe descargable')
-    st.write('Síntesis reproducible de la base actual. Las conclusiones automáticas son descriptivas y deben revisarse antes de su uso académico.')
-    st.info(interpret_dataset(df))
-    report=f'''LA-LAB v0.4 | INFORME EXPLORATORIO\nCaso: {title}\nProcedencia: {"Conjunto real: "+description if mode=="Casos guiados" else "Archivo aportado por el usuario"}\nRegistros: {len(df)}\nVariables: {len(df.columns)}\nFaltantes: {int(df.isna().sum().sum())}\nDuplicados completos: {int(df.duplicated().sum())}\nLimpieza: {st.session_state.get('last_cleaning','Sin operaciones registradas')}\nGráfico: {st.session_state.get('plot_summary','No evaluado')}\nMinería de datos: {st.session_state.get('ml_summary','No evaluado')}\n\nVARIABLES:\n{', '.join(map(str,df.columns))}\n\nESTADÍSTICAS NUMÉRICAS:\n{df.describe().to_string() if len(df.select_dtypes(include="number").columns) else "No hay variables numéricas"}\n\nNOTAS:\nLas asociaciones no implican causalidad. Los indicadores requieren validación contextual.\n'''
-    st.download_button('Descargar informe (.txt)',report.encode('utf-8'),'informe_la_lab.txt','text/plain')
+    st.header('6. Informe académico integral')
+    st.write('Exporta resultados, figuras, interpretaciones, limitaciones, recomendaciones y referencias. Solo se incluyen análisis efectivamente ejecutados en esta sesión.')
+    ml=st.session_state.get('ml_payload')
+    plot=st.session_state.get('plot_payload')
+    overview=describe_data(df,question, suggested_target)
+    st.info(overview)
+    if ml:
+        st.subheader('Interpretación del experimento más reciente')
+        st.info(explain_ml(ml))
+        st.write('**Recomendación metodológica:** compara con el modelo de referencia, valida la estabilidad y evita decisiones automatizadas sobre estudiantes.')
+    else:
+        st.warning('Todavía no se ha ejecutado un modelo de minería de datos en esta sesión; el informe no inventará resultados.')
+    if plot:
+        st.caption('Visualización exploratoria registrada: '+st.session_state.get('plot_summary',''))
+    else:
+        st.caption('No hay visualización exploratoria registrada. Se incorporarán gráficos descriptivos calculados a partir de la base.')
+    metadata={'caso':title,'fuente':description if mode=='Casos guiados' else 'Archivo proporcionado por el usuario',
+              'pregunta':question,'limpieza':st.session_state.get('last_cleaning','Sin transformaciones'),
+              'visualizacion':st.session_state.get('plot_summary','No ejecutada'),
+              'fuente_url':source['url'] if mode=='Casos guiados' else '',
+              'articulo':source['article'] if mode=='Casos guiados' else '',
+              'articulo_url':source['article_url'] if mode=='Casos guiados' else '',
+              'licencia':source.get('license','') if mode=='Casos guiados' else 'Verificar autorización del archivo',
+              'reflexion':st.session_state.get('reflection','')}
     st.download_button('Descargar datos actuales (.csv)',csv_bytes(df),'datos_la_lab.csv','text/csv')
-    # PDF textual reproducible; no reproduce figuras interactivas de Plotly.
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.lib.enums import TA_LEFT
-    from reportlab.lib import colors
-    from xml.sax.saxutils import escape
-    from datetime import datetime
-    pdf_buffer=io.BytesIO()
-    pdf_doc=SimpleDocTemplate(pdf_buffer,pagesize=(595,842),leftMargin=48,rightMargin=48,topMargin=48,bottomMargin=48)
-    styles=getSampleStyleSheet(); story=[Paragraph('LA-Lab v0.4 | Informe de analitica del aprendizaje',styles['Title']),Spacer(1,16)]
-    sections=[('Caso',title),('Fuente',description if mode=='Casos guiados' else 'Datos aportados por el usuario'),
-              ('Registros',str(len(df))),('Variables',str(len(df.columns))),
-              ('Faltantes',str(int(df.isna().sum().sum()))),('Duplicados',str(int(df.duplicated().sum()))),
-              ('Limpieza',str(st.session_state.get('last_cleaning','Sin operaciones registradas'))),
-              ('Visualizacion',str(st.session_state.get('plot_summary','No ejecutada'))),
-              ('Mineria de datos',str(st.session_state.get('ml_summary','No ejecutada')))]
-    if mode=='Casos guiados':
-        sections.extend([('Datos originales',source['url']),('Articulo asociado',source['article']),('Enlace articulo',source['article_url'])])
-    for heading,content in sections:
-        story.append(Paragraph('<b>'+escape(heading)+'</b>: '+escape(content),styles['BodyText']));story.append(Spacer(1,8))
-    story.append(Paragraph('<b>Limitaciones</b>: Asociacion no implica causalidad. Las metricas no acreditan validacion externa. Los datos educativos requieren proteccion y contextualizacion.',styles['BodyText']))
-    pdf_doc.build(story)
-    st.download_button('Descargar informe academico (.pdf)',pdf_buffer.getvalue(),'informe_la_lab_v04.pdf','application/pdf')
-    excel_buffer=io.BytesIO()
-    with pd.ExcelWriter(excel_buffer,engine='openpyxl') as writer:
-        df.head(5000).to_excel(writer,sheet_name='Datos',index=False)
-        pd.DataFrame([{'Campo':k,'Valor':v} for k,v in sections]).to_excel(writer,sheet_name='Resumen',index=False)
-        if len(df.select_dtypes(include='number').columns): df.describe().to_excel(writer,sheet_name='Estadisticas')
-    st.download_button('Descargar libro de analisis (.xlsx)',excel_buffer.getvalue(),'analisis_la_lab_v04.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-
-    text_box('El informe contiene el resumen de la base, los procedimientos de limpieza y las estadísticas numéricas. No constituye una evaluación individual ni una recomendación automática sobre estudiantes.')
-
+    txt='LA-Lab v0.5 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
+    st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v05.txt','text/plain')
+    try:
+        pdf=build_pdf(df,metadata,ml,plot)
+        st.download_button('Descargar informe académico completo (.pdf)',pdf,'informe_la_lab_v05.pdf','application/pdf')
+    except Exception as exc:
+        st.error(f'No se pudo generar el PDF: {exc}')
+    try:
+        xlsx=build_excel(df,metadata,ml)
+        st.download_button('Descargar libro de análisis (.xlsx)',xlsx,'analisis_la_lab_v05.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    except Exception as exc:
+        st.error(f'No se pudo generar el Excel: {exc}')
+    text_box('El informe incorpora análisis registrados, visualizaciones reproducibles, interpretación y sugerencias condicionadas. Las recomendaciones requieren revisión humana y no constituyen diagnóstico individual.')
 
 elif page=='7. Minería de datos':
     st.header('7. Minería de datos y aprendizaje automático')
@@ -411,6 +427,8 @@ elif page=='7. Minería de datos':
     if st.button('Ejecutar análisis',type='primary'):
         try:
             if not predictors: raise ValueError('Selecciona al menos una variable.')
+            if target=='G3' and any(c in predictors for c in ['G1','G2']):
+                st.warning('Atención a la temporalidad: G1 y G2 son calificaciones previas. Pueden ser predictores válidos al final del curso, pero no están disponibles al inicio; define el momento de predicción para evitar fuga temporal.')
             work=df[predictors+([target] if target else [])].copy()
             if target: work=work.dropna(subset=[target])
             if len(work)>5000: work=work.sample(5000,random_state=int(seed))
@@ -424,6 +442,9 @@ elif page=='7. Minería de datos':
             if nums: transforms.append(('num',Pipeline([('imp',SimpleImputer(strategy='median')),('scale',StandardScaler())]),nums))
             if cats: transforms.append(('cat',Pipeline([('imp',SimpleImputer(strategy='most_frequent')),('onehot',OneHotEncoder(handle_unknown='ignore',sparse_output=False))]),cats))
             pre=ColumnTransformer(transforms)
+            comparison_rows=None
+            cv_details=None
+            payload={'tarea':kind,'algoritmo':algorithm,'variables':list(predictors),'objetivo':target,'semilla':int(seed),'n':len(work),'porcentaje_prueba':test_pct if kind!='Agrupamiento' else None}
             if kind=='Clasificación':
                 y=work[target].astype(str)
                 if not 2<=y.nunique()<=30: raise ValueError('La clasificación requiere entre 2 y 30 categorías. Una calificación numérica con muchos valores corresponde a regresión.')
@@ -448,6 +469,7 @@ elif page=='7. Minería de datos':
                 fig=px.imshow(cm,x=labels,y=labels,text_auto=True,labels={'x':'Predicción','y':'Clase real','color':'Casos'},color_continuous_scale='Blues',aspect='auto')
                 st.plotly_chart(fig,use_container_width=True)
                 report=pd.DataFrame(classification_report(yte,pred,labels=labels,output_dict=True,zero_division=0)).T
+                payload.update({'reales':yte.astype(str).tolist(),'predicciones':pd.Series(pred).astype(str).tolist(),'etiquetas':list(map(str,labels)),'matriz':cm.tolist(),'metricas':{'Accuracy':acc,'Balanced accuracy':bacc,'F1 macro':f1,'Baseline accuracy':baseline_acc},'por_clase':report.loc[labels,['precision','recall','f1-score','support']].reset_index().rename(columns={'index':'Clase'}).to_dict('records')})
                 st.subheader('Desempeño por clase')
                 st.dataframe(report.loc[labels,['precision','recall','f1-score','support']].round(3),use_container_width=True)
                 st.plotly_chart(px.bar(report.loc[labels].reset_index(names='Clase'),x='Clase',y=['precision','recall','f1-score'],barmode='group',title='Métricas por clase'),use_container_width=True)
@@ -457,11 +479,15 @@ elif page=='7. Minería de datos':
                     for name,mdl in models.items():
                         p2=Pipeline([('prep',pre),('model',mdl)]).fit(Xtr,ytr).predict(Xte)
                         rows.append({'Algoritmo':name,'Accuracy':accuracy_score(yte,p2),'Balanced accuracy':balanced_accuracy_score(yte,p2),'F1 macro':f1_score(yte,p2,average='macro',zero_division=0)})
+                    comparison_rows=rows
                     st.subheader('Comparación exploratoria de modelos');st.dataframe(pd.DataFrame(rows).round(3),hide_index=True)
+                    metric='F1 macro' if kind=='Clasificación' else 'MAE'
+                    st.plotly_chart(px.bar(pd.DataFrame(rows),x='Algoritmo',y=metric,title='Comparación de algoritmos: '+metric),use_container_width=True)
                 if cv:
                     folds=min(3,int(ytr.value_counts().min()))
                     if folds>=2:
                         cvres=cross_validate(Pipeline([('prep',pre),('model',models[algorithm])]),Xtr,ytr,cv=StratifiedKFold(n_splits=folds,shuffle=True,random_state=int(seed)),scoring='f1_macro')
+                        cv_details={'metrica':'F1 macro','valores':cvres['test_score'].tolist()}
                         st.caption(f'CV en entrenamiento, F1 macro: {cvres["test_score"].mean():.3f} ± {cvres["test_score"].std():.3f}')
                     else: st.warning('No hay suficientes casos por clase para validación cruzada.')
             elif kind=='Regresión':
@@ -475,6 +501,7 @@ elif page=='7. Minería de datos':
                 mae=mean_absolute_error(yte,pred);rmse=np.sqrt(mean_squared_error(yte,pred));r2=r2_score(yte,pred)
                 base=DummyRegressor(strategy='mean').fit(Xtr,ytr);base_mae=mean_absolute_error(yte,base.predict(Xte))
                 result=f'Regresión {algorithm}: n prueba={len(yte)}, MAE={mae:.3f}, RMSE={rmse:.3f}, R²={r2:.3f}; baseline MAE={base_mae:.3f}.'
+                payload.update({'reales':yte.to_numpy().tolist(),'predicciones':np.asarray(pred).tolist(),'metricas':{'MAE':mae,'RMSE':rmse,'R2':r2,'Baseline MAE':base_mae}})
                 st.subheader('Calificaciones reales y predichas')
                 fig=px.scatter(x=yte.to_numpy(),y=pred,labels={'x':'Valor real','y':'Valor predicho'},title='Predicción frente a realidad')
                 low=float(min(np.min(yte),np.min(pred)));high=float(max(np.max(yte),np.max(pred)))
@@ -488,10 +515,13 @@ elif page=='7. Minería de datos':
                     for name,mdl in models.items():
                         p2=Pipeline([('prep',pre),('model',mdl)]).fit(Xtr,ytr).predict(Xte)
                         rows.append({'Algoritmo':name,'MAE':mean_absolute_error(yte,p2),'RMSE':np.sqrt(mean_squared_error(yte,p2)),'R²':r2_score(yte,p2)})
+                    comparison_rows=rows
                     st.subheader('Comparación exploratoria de modelos');st.dataframe(pd.DataFrame(rows).round(3),hide_index=True)
+                    metric='F1 macro' if kind=='Clasificación' else 'MAE'
+                    st.plotly_chart(px.bar(pd.DataFrame(rows),x='Algoritmo',y=metric,title='Comparación de algoritmos: '+metric),use_container_width=True)
                 if cv:
                     cvres=cross_validate(Pipeline([('prep',pre),('model',models[algorithm])]),Xtr,ytr,cv=KFold(n_splits=3,shuffle=True,random_state=int(seed)),scoring='neg_mean_absolute_error')
-                    values=-cvres['test_score'];st.caption(f'CV en entrenamiento, MAE: {values.mean():.3f} ± {values.std():.3f}')
+                    values=-cvres['test_score'];cv_details={'metrica':'MAE','valores':values.tolist()};st.caption(f'CV en entrenamiento, MAE: {values.mean():.3f} ± {values.std():.3f}')
             else:
                 Xt=pre.fit_transform(X)
                 models={'K-Means':KMeans(n_clusters=clusters,n_init=10,random_state=int(seed)),
@@ -503,6 +533,7 @@ elif page=='7. Minería de datos':
                 valid=(labels!=-1) if algorithm=='DBSCAN' else np.ones(len(labels),dtype=bool)
                 score=silhouette_score(Xt[valid],labels[valid]) if len(set(labels[valid]))>1 and len(set(labels[valid]))<sum(valid) and sum(valid)<=2000 else np.nan
                 result=f'Agrupamiento {algorithm}: n={len(Xt)}, grupos/etiquetas={len(unique)}, silhouette={score:.3f}.'
+                payload.update({'etiquetas_grupo':pd.Series(labels).astype(int).tolist(),'conteos':counts.to_dict(),'metricas':{'Silhouette':float(score) if np.isfinite(score) else None}})
                 st.subheader('Grupos identificados')
                 st.dataframe(counts.rename_axis('Grupo').reset_index(name='Observaciones'),hide_index=True)
                 st.subheader('Mapa de agrupamiento (proyección PCA)')
@@ -511,10 +542,13 @@ elif page=='7. Minería de datos':
                 plotdf=pd.DataFrame({'Componente 1':coords[:,0],'Componente 2':coords[:,1],'Grupo':[str(x) if x!=-1 else 'Ruido (-1)' for x in labels]})
                 fig=px.scatter(plotdf,x='Componente 1',y='Componente 2',color='Grupo',title='Cada punto representa una observación',opacity=.75)
                 st.plotly_chart(fig,use_container_width=True)
+                payload['pca_coordenadas']=coords.tolist()
+                payload['pca_varianza']=float(sum(pca.explained_variance_ratio_))
                 st.caption(f'PCA explica {100*sum(pca.explained_variance_ratio_):.1f}% de la varianza del espacio transformado en estos dos ejes. La separación visual es aproximada, no una validación de perfiles.')
                 st.subheader('Caracterización de grupos')
                 profiles=X.copy();profiles['Grupo']=labels
                 if nums:
+                    payload['perfiles']=profiles.groupby('Grupo')[nums].mean().reset_index().to_dict('records')
                     st.dataframe(profiles.groupby('Grupo')[nums].mean().round(2),use_container_width=True)
                     chosen=st.selectbox('Variable para comparar perfiles',nums)
                     st.plotly_chart(px.box(profiles,x=profiles['Grupo'].astype(str),y=chosen,labels={'x':'Grupo'},title=f'{chosen} por grupo'),use_container_width=True)
@@ -524,9 +558,17 @@ elif page=='7. Minería de datos':
                     for k in range(2,min(8,len(Xt)-1)+1):
                         lb=KMeans(n_clusters=k,n_init=10,random_state=int(seed)).fit_predict(Xt)
                         values.append({'k':k,'silhouette':silhouette_score(Xt,lb)})
+                    payload['comparacion_k']=values
                     st.plotly_chart(px.line(pd.DataFrame(values),x='k',y='silhouette',markers=True,title='Comparación exploratoria de k'),use_container_width=True)
+                    best=max(values,key=lambda row:row['silhouette'])
+                    st.info(f'El mejor silhouette explorado se obtuvo con k={best["k"]} ({best["silhouette"]:.3f}); no demuestra que esos grupos sean perfiles pedagógicos válidos.')
                 st.caption('Los grupos son patrones exploratorios, no diagnósticos de estudiantes. En DBSCAN, -1 identifica ruido.')
+            payload['resultado']=result
+            payload['comparacion']=comparison_rows
+            payload['validacion_cruzada']=cv_details
+            st.session_state.ml_payload=payload
             st.success(result)
+            st.info(explain_ml(payload))
             st.session_state.ml_summary=result
             st.session_state.ml_details={'tarea':kind,'algoritmo':algorithm,'variables':predictors,'objetivo':target,'resultado':result}
             if kind=='Regresión':
@@ -539,4 +581,4 @@ elif page=='7. Minería de datos':
             st.error(f'No fue posible ejecutar el modelo: {ex}')
 
 st.divider()
-st.caption('LA-Lab v0.4 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
+st.caption('LA-Lab v0.5 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
