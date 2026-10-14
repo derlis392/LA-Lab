@@ -1,4 +1,4 @@
-"""LA-Lab v0.5 — Laboratorio abierto de Analítica del Aprendizaje."""
+"""LA-Lab v0.5.1 — Laboratorio abierto de Analítica del Aprendizaje."""
 import io
 import json
 from pathlib import Path
@@ -127,7 +127,7 @@ h1,h2,h3 {letter-spacing:-.02em}
 
 with st.sidebar:
     st.title('🎓 LA-Lab')
-    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.5')
+    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.5.1')
     mode = st.radio('Modalidad', ['Casos guiados','Datos propios'],key='mode')
     idx = None
     if mode == 'Casos guiados':
@@ -355,7 +355,7 @@ elif page=='6. Informe':
               'licencia':source.get('license','') if mode=='Casos guiados' else 'Verificar autorización del archivo',
               'reflexion':st.session_state.get('reflection','')}
     st.download_button('Descargar datos actuales (.csv)',csv_bytes(df),'datos_la_lab.csv','text/csv')
-    txt='LA-Lab v0.5 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
+    txt='LA-Lab v0.5.1 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
     st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v05.txt','text/plain')
     try:
         pdf=build_pdf(df,metadata,ml,plot)
@@ -431,6 +431,10 @@ elif page=='7. Minería de datos':
                 st.warning('Atención a la temporalidad: G1 y G2 son calificaciones previas. Pueden ser predictores válidos al final del curso, pero no están disponibles al inicio; define el momento de predicción para evitar fuga temporal.')
             work=df[predictors+([target] if target else [])].copy()
             if target: work=work.dropna(subset=[target])
+            if kind=='Clasificación':
+                freq=work[target].value_counts()
+                if len(freq)>1 and freq.min()<2:
+                    raise ValueError(f'La variable {target} tiene categorías con una sola observación; no admite partición estratificada. Si es una calificación numérica, considera regresión o crea categorías justificadas antes de cargar los datos.')
             if len(work)>5000: work=work.sample(5000,random_state=int(seed))
             if len(work)<20: raise ValueError('Se necesitan al menos 20 observaciones válidas.')
             X=work[predictors].copy()
@@ -535,7 +539,7 @@ elif page=='7. Minería de datos':
                 result=f'Agrupamiento {algorithm}: n={len(Xt)}, grupos/etiquetas={len(unique)}, silhouette={score:.3f}.'
                 payload.update({'etiquetas_grupo':pd.Series(labels).astype(int).tolist(),'conteos':counts.to_dict(),'metricas':{'Silhouette':float(score) if np.isfinite(score) else None}})
                 st.subheader('Grupos identificados')
-                st.dataframe(counts.rename_axis('Grupo').reset_index(name='Observaciones'),hide_index=True)
+                st.dataframe(counts.rename_axis('Grupo').reset_index(name='Observaciones').assign(Porcentaje=lambda d:(100*d['Observaciones']/len(Xt)).round(1)),hide_index=True)
                 st.subheader('Mapa de agrupamiento (proyección PCA)')
                 coords=PCA(n_components=2,random_state=int(seed)).fit_transform(Xt)
                 pca=PCA(n_components=2,random_state=int(seed)).fit(Xt)
@@ -550,6 +554,7 @@ elif page=='7. Minería de datos':
                 if nums:
                     payload['perfiles']=profiles.groupby('Grupo')[nums].mean().reset_index().to_dict('records')
                     st.dataframe(profiles.groupby('Grupo')[nums].mean().round(2),use_container_width=True)
+                    st.info('Descripción exploratoria: '+ ' | '.join(f'Grupo {g}: '+', '.join(f'{v}={row[v]:.2f}' for v in nums[:5]) for g,row in profiles.groupby('Grupo')[nums].mean().iterrows())+' . Son promedios de variables originales, no diagnósticos ni relaciones causales.')
                     chosen=st.selectbox('Variable para comparar perfiles',nums)
                     st.plotly_chart(px.box(profiles,x=profiles['Grupo'].astype(str),y=chosen,labels={'x':'Grupo'},title=f'{chosen} por grupo'),use_container_width=True)
                 else: st.info('Selecciona al menos una variable numérica para comparar medias por grupo.')
@@ -561,6 +566,7 @@ elif page=='7. Minería de datos':
                     payload['comparacion_k']=values
                     st.plotly_chart(px.line(pd.DataFrame(values),x='k',y='silhouette',markers=True,title='Comparación exploratoria de k'),use_container_width=True)
                     best=max(values,key=lambda row:row['silhouette'])
+                    st.dataframe(pd.DataFrame(values).round(4),hide_index=True,use_container_width=True)
                     st.info(f'El mejor silhouette explorado se obtuvo con k={best["k"]} ({best["silhouette"]:.3f}); no demuestra que esos grupos sean perfiles pedagógicos válidos.')
                 st.caption('Los grupos son patrones exploratorios, no diagnósticos de estudiantes. En DBSCAN, -1 identifica ruido.')
             payload['resultado']=result
@@ -581,4 +587,4 @@ elif page=='7. Minería de datos':
             st.error(f'No fue posible ejecutar el modelo: {ex}')
 
 st.divider()
-st.caption('LA-Lab v0.5 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
+st.caption('LA-Lab v0.5.1 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')

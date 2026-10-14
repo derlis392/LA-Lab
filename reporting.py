@@ -27,7 +27,7 @@ def explain_ml(ml):
         mae=met['MAE']; base=met['Baseline MAE']; r2=met['R2']
         relation='menor' if mae<base else 'mayor o igual'
         improvement=(base-mae)/base*100 if base else 0
-        text=(f'La regresión {ml["algoritmo"]} obtuvo MAE={mae:.3f}, RMSE={met["RMSE"]:.3f} y R²={r2:.3f}. '
+        text=(f'El modelo de regresión {ml["algoritmo"]} obtuvo MAE={mae:.3f}, RMSE={met["RMSE"]:.3f} y R²={r2:.3f}. '
               f'El error absoluto fue {relation} que el del modelo de referencia (MAE={base:.3f}); cambio relativo: {improvement:+.1f}% de reducción del error. '
               'La gráfica real-predicho permite identificar sobreestimaciones y subestimaciones; los residuos muestran casos con errores elevados. ')
         if r2<.3: text+='El R² es bajo en esta partición: la capacidad predictiva es limitada. '
@@ -53,6 +53,12 @@ def explain_ml(ml):
         if ml.get('comparacion_k'):
             best=max(ml['comparacion_k'],key=lambda row:row['silhouette'])
             text+=f'En la exploración de k, el valor más alto corresponde a k={best["k"]} (silhouette={best["silhouette"]:.3f}). '
+        if ml.get('perfiles'):
+            profiles=ml['perfiles']; keys=[k for k in profiles[0] if k!='Grupo']
+            for row in profiles:
+                if keys:
+                    text+=f'Grupo {row["Grupo"]}: '+', '.join(f'{k}={row[k]:.2f}' for k in keys[:5])+'. '
+            text+='Estos promedios describen variables codificadas; no son diagnósticos. '
         text+='La proyección PCA es una representación aproximada; los grupos no constituyen perfiles educativos validados. Sugerencia: caracterizar variables por grupo, examinar estabilidad y contrastar con teoría pedagógica.'
     if comp:
         metric='F1 macro' if task=='Clasificación' else 'MAE'
@@ -82,7 +88,9 @@ def _chart_image(df,plot,ml,which):
     import matplotlib.pyplot as plt
     fig,ax=plt.subplots(figsize=(8,4.3),dpi=120)
     if which=='correlation':
-        cols=df.select_dtypes(include='number').columns[:12]
+        cols=list(df.select_dtypes(include='number').columns[:10])
+        target=ml.get('objetivo') if ml else None
+        if target in df.select_dtypes(include='number') and target not in cols: cols=cols[:9]+[target]
         if len(cols)<2:plt.close(fig);return None
         corr=df[cols].corr();im=ax.imshow(corr,vmin=-1,vmax=1,cmap='coolwarm')
         ax.set_xticks(range(len(cols)),cols,rotation=65,ha='right',fontsize=7)
@@ -90,8 +98,9 @@ def _chart_image(df,plot,ml,which):
         ax.set_title('Matriz de correlación (Pearson)')
     elif which=='overview':
         numeric=df.select_dtypes(include='number').columns
+        target=ml.get('objetivo') if ml else None
         if len(numeric):
-            col=numeric[0]; ax.hist(df[col].dropna(),bins=min(20,max(5,df[col].nunique())),edgecolor='white');ax.set_title('Distribución de '+str(col));ax.set_xlabel(str(col));ax.set_ylabel('Frecuencia')
+            col=target if target in numeric else numeric[0]; ax.hist(df[col].dropna(),bins=min(20,max(5,df[col].nunique())),edgecolor='white');ax.set_title('Distribución de '+str(col));ax.set_xlabel(str(col));ax.set_ylabel('Frecuencia')
         else:
             col=df.columns[0];v=df[col].astype(str).value_counts().head(10);ax.bar(v.index,v.values);ax.tick_params(axis='x',rotation=45);ax.set_title('Frecuencias de '+str(col))
     elif which=='plot' and plot:
@@ -170,7 +179,19 @@ def build_pdf(df,meta,ml=None,plot=None):
             im=PILImage.open(png);w,h=im.size; maxw=16.5*cm;maxh=10*cm;scale=min(maxw/w,maxh/h)
             png.seek(0)
             story.append(KeepTogether([Image(png,width=w*scale,height=h*scale),Paragraph(escape(caption),styles['LabBody'])]))
-    story.append(Paragraph('LA-Lab v0.5 | Informe académico de analítica del aprendizaje',styles['LabTitle']))
+    from pathlib import Path
+    assets=Path(__file__).resolve().parent/'assets'
+    logo_cells=[]
+    for file, max_width, max_height in [('unam.png',2.1*cm,2.1*cm),('cuaed.png',5.4*cm,2.0*cm)]:
+        path=assets/file
+        if path.exists():
+            from PIL import Image as PILImage
+            iw,ih=PILImage.open(path).size; factor=min(max_width/iw,max_height/ih)
+            logo_cells.append(Image(str(path),width=iw*factor,height=ih*factor))
+    if logo_cells:
+        logo_table=Table([[logo_cells[0],logo_cells[1]]] if len(logo_cells)==2 else [logo_cells],hAlign='LEFT',colWidths=[3*cm,12*cm] if len(logo_cells)==2 else None)
+        story.append(logo_table);story.append(Spacer(1,12))
+    story.append(Paragraph('LA-Lab v0.5.1 | Informe académico de analítica del aprendizaje',styles['LabTitle']))
     para('Caso: '+meta['caso']);para('Generado: '+datetime.now().strftime('%Y-%m-%d %H:%M')+' | Documento exploratorio; revisión humana requerida')
     heading('1. Propósito y procedencia')
     para('Pregunta de investigación: '+meta['pregunta']);para('Fuente: '+meta['fuente']);para('Licencia declarada: '+meta['licencia'])
@@ -183,21 +204,28 @@ def build_pdf(df,meta,ml=None,plot=None):
     figure('overview','Figura 1. Distribución descriptiva de una variable del conjunto.')
     if len(numeric.columns)>1:figure('correlation','Figura 2. Correlaciones lineales; interpretar con cautela variables ordinales o codificadas.')
     heading('3. Visualización e interpretación exploratoria');para(summarize_plot(df,plot))
-    if plot:figure('plot','Figura 3. Gráfico exploratorio registrado en el laboratorio.')
+    if plot and plot.get('tipo')!='correlacion':figure('plot','Figura 3. Visualización seleccionada: '+str(plot.get('tipo'))+'.')
     heading('4. Minería de datos y evaluación')
     if ml:
         para('Tarea: '+ml['tarea']+' | Algoritmo: '+ml['algoritmo']+' | Semilla: '+str(ml['semilla'])+' | N: '+str(ml['n']))
         para('Variable objetivo: '+str(ml.get('objetivo'))+' | Predictores: '+', '.join(ml['variables']))
         if ml.get('porcentaje_prueba'):para('Partición de prueba: '+str(ml['porcentaje_prueba'])+' %. Preprocesamiento y ajuste del modelo deben restringirse al entrenamiento.')
         table([['Métrica','Resultado']]+[[str(k),f'{v:.3f}' if isinstance(v,(int,float)) else str(v)] for k,v in ml.get('metricas',{}).items()])
-        figure('ml_primary','Figura de evaluación principal del experimento ejecutado.')
-        figure('ml_secondary','Figura diagnóstica complementaria.')
+        if ml['tarea']=='Agrupamiento' and ml.get('perfiles'):
+            rows=ml['perfiles']; columns=list(rows[0])[:6]
+            table([columns]+[[f'{v:.2f}' if isinstance(v,(int,float)) else str(v) for v in [row[k] for k in columns]] for row in rows])
+            para('Las medias caracterizan los grupos en sus escalas originales; las categorías ordinales no representan necesariamente unidades continuas.')
+        figure('ml_primary',{'Regresión':'Valores reales frente a predicciones. La línea diagonal indica predicción perfecta.','Clasificación':'Matriz de confusión: filas reales, columnas predichas; examine errores de cada clase.','Agrupamiento':'Proyección PCA de grupos: la separación visual no valida perfiles.'}[ml['tarea']])
+        figure('ml_secondary',{'Regresión':'Residuos: los errores grandes o patrones sistemáticos requieren revisión.','Clasificación':'Precisión, recall y F1 por clase: contraste el rendimiento minoritario.','Agrupamiento':'Comparación de silhouette por k o distribución de tamaños de grupos.'}[ml['tarea']])
         if ml.get('comparacion'):
             heading('4.1 Comparación de algoritmos')
             rows=ml['comparacion'];keys=list(rows[0]);table([keys]+[[f'{r[k]:.3f}' if isinstance(r[k],(int,float)) else str(r[k]) for k in keys] for r in rows]);figure('comparison','Comparación visual por métrica principal.')
         if ml.get('validacion_cruzada'):
             cv=ml['validacion_cruzada'];para(f'Validación cruzada en entrenamiento ({len(cv["valores"])} particiones): {cv["metrica"]} = {np.mean(cv["valores"]):.3f} ± {np.std(cv["valores"]):.3f}. Valores por partición: '+', '.join(f'{v:.3f}' for v in cv['valores']))
         heading('5. Interpretación contextualizada');para(explain_ml(ml))
+        if ml['tarea']=='Regresión':para('MAE expresa el error absoluto promedio en unidades del objetivo; RMSE penaliza más los errores grandes; R² compara la variación explicada frente a predecir la media de prueba. Examine el modelo de referencia y la estabilidad fuera de la muestra.')
+        elif ml['tarea']=='Clasificación':para('Accuracy mide la proporción de aciertos; balanced accuracy promedia el recall de las clases; F1 macro promedia los F1 sin ponderar por tamaño. Con clases desbalanceadas, accuracy puede ocultar errores en la minoría.')
+        else:para('Silhouette compara cohesión y separación de grupos; valores próximos a cero sugieren superposición. La elección de k exige también estabilidad, interpretabilidad y justificación educativa.')
     else:para('No se registró un experimento de minería de datos en esta sesión. No se reportan métricas ni conclusiones no ejecutadas.')
     heading('6. Recomendaciones y limitaciones')
     para('Recomendación docente: formular hipótesis verificables a partir de los patrones observados, contrastar explicaciones alternativas y documentar el contexto, la temporalidad y las escalas de las variables. Utilizar el informe como evidencia de una práctica de análisis, no como diagnóstico automático.')
@@ -208,7 +236,7 @@ def build_pdf(df,meta,ml=None,plot=None):
         if meta.get(key):para(meta[key])
     para('Los resultados calculados por LA-Lab no son una reproducción automática de los resultados del artículo asociado. Para reproducir el experimento se requieren los datos originales, las variables seleccionadas, la semilla, el preprocesamiento y la versión del código.')
     def footer(canvas,doc):
-        canvas.setFont('Helvetica',8);canvas.setFillColor(colors.grey);canvas.drawString(1.8*cm,1.1*cm,'LA-Lab v0.5 · Informe exploratorio · No tomar decisiones automatizadas sobre estudiantes');canvas.drawRightString(19.2*cm,1.1*cm,str(doc.page))
+        canvas.setFont('Helvetica',8);canvas.setFillColor(colors.grey);canvas.drawString(1.8*cm,1.1*cm,'LA-Lab v0.5.1 · Informe exploratorio · No tomar decisiones automatizadas sobre estudiantes');canvas.drawRightString(19.2*cm,1.1*cm,str(doc.page))
     doc.build(story,onFirstPage=footer,onLaterPages=footer);return buf.getvalue()
 
 
