@@ -1,4 +1,4 @@
-# LA-Lab v0.6.3.1 — Laboratorio Virtual de Analítica del Aprendizaje
+# LA-Lab v0.6.3.2 — Laboratorio Virtual de Analítica del Aprendizaje
 
 Aplicación educativa abierta con siete módulos y **14 prácticas guiadas basadas en dos colecciones reales de UCI**. Las prácticas son preguntas diferentes sobre los mismos conjuntos de datos, no 14 datasets independientes.
 
@@ -9,14 +9,14 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Cambios de v0.6.3.1
+## Cambios de v0.6.3.2
 
 - **Caso 12: Respuestas y dificultades en matemáticas**: MathE, UCI 1031 (9546 respuestas, 8 variables). Se estudian respuestas correctas/incorrectas por tema y dificultad; cada registro es una respuesta, no un estudiante independiente.
 - **Caso 13: Hábitos de estudio y desempeño universitario**: Higher Education Students Performance Evaluation, UCI 856 (145 estudiantes, 31 características y calificación objetivo). Los campos codificados se interpretan con el diccionario oficial.
 - **Caso 14: Factores de permanencia universitaria**: Predict Students’ Dropout and Academic Success, UCI 697. Se analizan matrícula, becas y trayectoria, sin inferencia causal.
 - Los tres casos tienen **fuentes originales diferentes** y se cargan automáticamente, con descarga del CSV de la práctica y enlace a fuente/artículo.
 - El límite global de carga sigue siendo **10 MB**. No se necesita subir ZIP para casos guiados.
-- `app.py`, `reporting.py`, `requirements.txt`, `README.md` y `.streamlit/config.toml` están sincronizados con v0.6.3.1.
+- `app.py`, `reporting.py`, `requirements.txt`, `README.md` y `.streamlit/config.toml` están sincronizados con v0.6.3.2.
 - PDF y XLSX se mantienen en el módulo 6. Los logotipos proporcionados se conservan en `assets/`.
 
 ## Fuentes académicas y acceso directo
@@ -33,7 +33,7 @@ Las prácticas 12–14 **no miden clics en entornos virtuales**: se redefinieron
 
 ## Despliegue
 
-Subir **todos los archivos de este ZIP** a la raíz de `main` en GitHub, conservando `.streamlit/config.toml` y `assets/`. Si Streamlit Cloud mantiene una sesión antigua, usar `Manage app → Reboot app`. Confirmar `v0.6.3.1` en la barra lateral y en un PDF recién generado.
+Subir **todos los archivos de este ZIP** a la raíz de `main` en GitHub, conservando `.streamlit/config.toml` y `assets/`. Si Streamlit Cloud mantiene una sesión antigua, usar `Manage app → Reboot app`. Confirmar `v0.6.3.2` en la barra lateral y en un PDF recién generado.
 
 ## Comprobaciones sugeridas
 

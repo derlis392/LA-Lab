@@ -1,4 +1,4 @@
-"""LA-Lab v0.6.3.1 — Laboratorio abierto de Analítica del Aprendizaje."""
+"""LA-Lab v0.6.3.2 — Laboratorio abierto de Analítica del Aprendizaje."""
 import io
 import json
 import zipfile
@@ -98,7 +98,6 @@ def load_original(source_id):
     from ucimlrepo import fetch_ucirepo
     source = SOURCES[source_id]
     if source_id.startswith('student_'):
-        import urllib.request
         url='https://archive.ics.uci.edu/static/public/320/student+performance.zip'
         with urllib.request.urlopen(url,timeout=25) as response:
             payload=response.read()
@@ -126,7 +125,7 @@ def load_original(source_id):
         errors = []
         for url in endpoints:
             try:
-                request = urllib.request.Request(url, headers={'User-Agent': 'LA-Lab/0.6.3.1 (educational research)'})
+                request = urllib.request.Request(url, headers={'User-Agent': 'LA-Lab/0.6.3.2 (educational research)'})
                 with urllib.request.urlopen(request, timeout=30) as response:
                     if int(response.headers.get('Content-Length', '0') or '0') > 45 * 1024 * 1024:
                         raise ValueError('Archivo comprimido demasiado grande.')
@@ -204,7 +203,7 @@ h1,h2,h3 {letter-spacing:-.02em}
 
 with st.sidebar:
     st.title('🎓 LA-Lab')
-    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.3.1')
+    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.3.2')
     mode = st.radio('Modalidad', ['Casos guiados','Datos propios'],key='mode')
     idx = None
     if mode == 'Casos guiados':
@@ -449,7 +448,7 @@ elif page=='6. Informe':
               'licencia':source.get('license','') if mode=='Casos guiados' else 'Verificar autorización del archivo',
               'reflexion':st.session_state.get('reflection','')}
     st.download_button('Descargar datos actuales (.csv)',csv_bytes(df),'datos_la_lab.csv','text/csv')
-    txt='LA-Lab v0.6.3.1 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
+    txt='LA-Lab v0.6.3.2 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
     st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v061.txt','text/plain')
     st.caption(f'Generador de informes cargado: {getattr(reporting, "REPORT_VERSION", "ANTIGUO")} · archivo: {Path(reporting.__file__).name}')
     try:
@@ -457,7 +456,7 @@ elif page=='6. Informe':
             st.error('VERSIONES INCOMPATIBLES: actualiza reporting.py junto con app.py en la raíz del repositorio y reinicia Streamlit. No se descargará un PDF antiguo.')
         else:
             pdf=build_pdf(df,metadata,ml,plot)
-            st.download_button('Descargar informe académico v0.6.3.1 (.pdf)',pdf,'informe_la_lab_v0631.pdf','application/pdf')
+            st.download_button('Descargar informe académico v0.6.3.2 (.pdf)',pdf,'informe_la_lab_v0632.pdf','application/pdf')
     except Exception as exc:
         st.error(f'No se pudo generar el PDF: {exc}')
     try:
