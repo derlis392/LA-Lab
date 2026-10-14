@@ -49,3 +49,11 @@ Copiar a la raíz del repositorio `app.py`, `reporting.py` y `requirements.txt` 
 - Reportes: versión unificada v0.5.2 en app, PDF y pie de página; imágenes más compactas; prevención de histogramas duplicados; leyendas específicas y referencias sin URLs repetidas.
 - Validación pendiente tras despliegue: probar PDF nuevo en Streamlit Cloud, las tres tareas de ML y exportación Excel.
 - Los resultados de comparación entre modelos en prueba son exploratorios: no elegir el modelo final optimizando sobre ese conjunto.
+
+
+## v0.5.3 — Corrección de despliegue y presentación
+- Logotipos desplazados 52 px hacia abajo en el encabezado de Streamlit; tamaños explícitos.
+- Encabezado de «Fuentes y reproducibilidad» unido a su contenido para evitar título huérfano.
+- Identificador v0.5.3 en aplicación y PDF.
+- Para desplegar: subir **app.py y reporting.py**, además de assets/unam.png y assets/cuaed.png, en la raíz correcta del repositorio; comprobar que Streamlit usa la rama y el archivo app.py actualizados.
+- Verificación rápida: la interfaz y un PDF nuevo deben mostrar ambos v0.5.3. Si no, se está ejecutando código anterior.

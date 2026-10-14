@@ -191,7 +191,7 @@ def build_pdf(df,meta,ml=None,plot=None):
     if logo_cells:
         logo_table=Table([[logo_cells[0],logo_cells[1]]] if len(logo_cells)==2 else [logo_cells],hAlign='LEFT',colWidths=[3*cm,12*cm] if len(logo_cells)==2 else None)
         story.append(logo_table);story.append(Spacer(1,12))
-    story.append(Paragraph('LA-Lab v0.5.2 | Informe académico de analítica del aprendizaje',styles['LabTitle']))
+    story.append(Paragraph('LA-Lab v0.5.3 | Informe académico de analítica del aprendizaje',styles['LabTitle']))
     para('Caso: '+meta['caso']);para('Generado: '+datetime.now().strftime('%Y-%m-%d %H:%M')+' | Documento exploratorio; revisión humana requerida')
     heading('1. Propósito y procedencia')
     para('Pregunta de investigación: '+meta['pregunta']);para('Fuente: '+meta['fuente']);para('Licencia declarada: '+meta['licencia'])
@@ -230,7 +230,7 @@ def build_pdf(df,meta,ml=None,plot=None):
         figure('ml_secondary',{'Regresión':'Residuos: los errores grandes o patrones sistemáticos requieren revisión.','Clasificación':'Precisión, recall y F1 por clase: contraste el rendimiento minoritario.','Agrupamiento':'Comparación de silhouette por k o distribución de tamaños de grupos.'}[ml['tarea']])
         if ml.get('comparacion'):
             heading('4.1 Comparación de algoritmos')
-            rows=ml['comparacion'];keys=list(rows[0]);table([keys]+[[f'{r[k]:.3f}' if isinstance(r[k],(int,float)) else str(r[k]) for k in keys] for r in rows]);figure('comparison','Comparación visual por métrica principal.')
+            rows=ml['comparacion'];keys=list(rows[0]);table([keys]+[[f'{r[k]:.3f}' if isinstance(r[k],(int,float)) else str(r[k]) for k in keys] for r in rows]);figure('comparison','Comparación de algoritmos según la métrica principal del experimento.')
         if ml.get('validacion_cruzada'):
             cv=ml['validacion_cruzada'];para(f'Validación cruzada en entrenamiento ({len(cv["valores"])} particiones): {cv["metrica"]} = {np.mean(cv["valores"]):.3f} ± {np.std(cv["valores"]):.3f}. Valores por partición: '+', '.join(f'{v:.3f}' for v in cv['valores']))
         heading('5. Interpretación contextualizada');para(explain_ml(ml))
@@ -242,16 +242,16 @@ def build_pdf(df,meta,ml=None,plot=None):
     para('Recomendación docente: formular hipótesis verificables a partir de los patrones observados, contrastar explicaciones alternativas y documentar el contexto, la temporalidad y las escalas de las variables. Utilizar el informe como evidencia de una práctica de análisis, no como diagnóstico automático.')
     para('Limitaciones: el análisis exploratorio no demuestra causalidad; los resultados de una sola partición no acreditan generalización externa. Las variables de rendimiento pueden estar temporalmente relacionadas y producir fuga de información. Los conjuntos educativos requieren controles de privacidad, representatividad y revisión ética.')
     if meta.get('reflexion'):heading('Reflexión de la persona participante');para(meta['reflexion'])
-    heading('7. Fuentes y reproducibilidad')
+    # Encabezado y contenido de fuentes deben permanecer juntos.
     # Mantener íntegra la sección final, sin páginas huérfanas.
     reference_items=[]
     for key in ['fuente_url','articulo','articulo_url']:
         if meta.get(key) and str(meta[key]) not in [str(v) for v in reference_items]:reference_items.append(meta[key])
     ref_text='Fuentes: '+' | '.join(str(x) for x in reference_items)
     repro='Los resultados de LA-Lab no reproducen automáticamente los del artículo citado. Reproducibilidad: datos originales, variables, semilla, partición, preprocesamiento y versión del código.'
-    story.append(KeepTogether([Paragraph(escape(ref_text),styles['LabBody']),Paragraph(escape(repro),styles['LabBody'])]))
+    story.append(KeepTogether([Paragraph('7. Fuentes y reproducibilidad',styles['LabH']),Paragraph(escape(ref_text),styles['LabBody']),Paragraph(escape(repro),styles['LabBody'])]))
     def footer(canvas,doc):
-        canvas.setFont('Helvetica',8);canvas.setFillColor(colors.grey);canvas.drawString(1.8*cm,1.1*cm,'LA-Lab v0.5.2 · Informe exploratorio · No tomar decisiones automatizadas sobre estudiantes');canvas.drawRightString(19.2*cm,1.1*cm,str(doc.page))
+        canvas.setFont('Helvetica',8);canvas.setFillColor(colors.grey);canvas.drawString(1.8*cm,1.1*cm,'LA-Lab v0.5.3 · Informe exploratorio · No tomar decisiones automatizadas sobre estudiantes');canvas.drawRightString(19.2*cm,1.1*cm,str(doc.page))
     doc.build(story,onFirstPage=footer,onLaterPages=footer);return buf.getvalue()
 
 
