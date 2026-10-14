@@ -1,7 +1,8 @@
-"""LA-Lab v0.5.3 — Laboratorio abierto de Analítica del Aprendizaje."""
+"""LA-Lab v0.5.4 — Laboratorio abierto de Analítica del Aprendizaje."""
 import io
 import json
 from pathlib import Path
+import reporting
 from reporting import build_pdf, build_excel, explain_ml, describe_data, summarize_plot
 import numpy as np
 import pandas as pd
@@ -127,7 +128,7 @@ h1,h2,h3 {letter-spacing:-.02em}
 
 with st.sidebar:
     st.title('🎓 LA-Lab')
-    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.5.3')
+    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.5.4')
     mode = st.radio('Modalidad', ['Casos guiados','Datos propios'],key='mode')
     idx = None
     if mode == 'Casos guiados':
@@ -357,11 +358,15 @@ elif page=='6. Informe':
               'licencia':source.get('license','') if mode=='Casos guiados' else 'Verificar autorización del archivo',
               'reflexion':st.session_state.get('reflection','')}
     st.download_button('Descargar datos actuales (.csv)',csv_bytes(df),'datos_la_lab.csv','text/csv')
-    txt='LA-Lab v0.5.3 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
+    txt='LA-Lab v0.5.4 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
     st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v05.txt','text/plain')
+    st.caption(f'Generador de informes cargado: {getattr(reporting, "REPORT_VERSION", "ANTIGUO")} · archivo: {Path(reporting.__file__).name}')
     try:
-        pdf=build_pdf(df,metadata,ml,plot)
-        st.download_button('Descargar informe académico completo (.pdf)',pdf,'informe_la_lab_v05.pdf','application/pdf')
+        if getattr(reporting, 'REPORT_VERSION', None) != '0.5.4':
+            st.error('VERSIONES INCOMPATIBLES: actualiza reporting.py junto con app.py en la raíz del repositorio y reinicia Streamlit. No se descargará un PDF antiguo.')
+        else:
+            pdf=build_pdf(df,metadata,ml,plot)
+            st.download_button('Descargar informe académico v0.5.4 (.pdf)',pdf,'informe_la_lab_v054.pdf','application/pdf')
     except Exception as exc:
         st.error(f'No se pudo generar el PDF: {exc}')
     try:
@@ -589,4 +594,4 @@ elif page=='7. Minería de datos':
             st.error(f'No fue posible ejecutar el modelo: {ex}')
 
 st.divider()
-st.caption('LA-Lab v0.5.3 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
+st.caption('LA-Lab v0.5.4 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')

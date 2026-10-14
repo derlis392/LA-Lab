@@ -57,3 +57,7 @@ Copiar a la raíz del repositorio `app.py`, `reporting.py` y `requirements.txt` 
 - Identificador v0.5.3 en aplicación y PDF.
 - Para desplegar: subir **app.py y reporting.py**, además de assets/unam.png y assets/cuaed.png, en la raíz correcta del repositorio; comprobar que Streamlit usa la rama y el archivo app.py actualizados.
 - Verificación rápida: la interfaz y un PDF nuevo deben mostrar ambos v0.5.3. Si no, se está ejecutando código anterior.
+
+
+## Control de versiones de informes (v0.5.4)
+Actualizar **app.py y reporting.py juntos**, en la raíz del repositorio. La pantalla del módulo 6 muestra la versión real del generador importado. Si no es 0.5.4, bloquea la descarga del PDF en lugar de ofrecer una versión anterior. Descargar `informe_la_lab_v054.pdf` y verificar que título y pie muestren v0.5.4. La sección 7 comienza en página nueva para evitar encabezados huérfanos.
