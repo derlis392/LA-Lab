@@ -1,4 +1,4 @@
-"""LA-Lab v0.6.8 — Laboratorio abierto de Analítica del Aprendizaje."""
+"""LA-Lab v0.6.9 — Laboratorio abierto de Analítica del Aprendizaje."""
 import io
 import json
 import zipfile
@@ -195,7 +195,7 @@ h1,h2,h3 {letter-spacing:-.02em}
 
 with st.sidebar:
     st.title('🎓 LA-Lab')
-    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.8')
+    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.9')
     mode = st.radio('Modalidad', ['Casos guiados','Datos propios'],key='mode')
     idx = None
     if mode == 'Casos guiados':
@@ -205,36 +205,39 @@ with st.sidebar:
     page = st.radio('Módulo',['Inicio','1. Datos','2. Limpieza','3. Indicadores','4. Visualización','5. Interpretación','6. Informe','7. Minería de datos'])
     st.warning('Utiliza datos sintéticos o autorizados y desidentificados. No cargues datos personales sensibles.')
 
-header_left, header_right = st.columns([3.5, 1.6], vertical_alignment="top")
+header_left, header_right = st.columns([2.7, 2.3], vertical_alignment="center", gap="medium")
 with header_left:
     st.title('🎓 LA-Lab')
     st.caption('Tecnologías Inteligentes para la Transformación Digital de los Ecosistemas Educativos')
     st.caption('Dr. Derlis Hernández Lara · CUAED · Universidad Nacional Autónoma de México')
 with header_right:
-    st.markdown("<div style='height:58px'></div>", unsafe_allow_html=True)
     logos = ROOT/'assets'
-    unam, cuaed = logos/'unam.png', logos/'cuaed.png'
-    research_logo = logos/'linea_investigacion.svg'
-    if unam.exists() and cuaed.exists():
-        col_unam, col_cuaed, col_linea = st.columns([1, 2.1, 1.5], vertical_alignment="center")
-        with col_unam:
-            st.image(str(unam), use_container_width=True)
-        with col_cuaed:
-            st.image(str(cuaed), use_container_width=True)
-        with col_linea:
-            if research_logo.exists():
-                svg_base64 = base64.b64encode(research_logo.read_bytes()).decode('ascii')
-                st.markdown(
-                    f'<img src="data:image/svg+xml;base64,{svg_base64}" '
-                    'alt="Logotipo de la línea de investigación TITDEE" '
-                    'title="Tecnologías Inteligentes para la Transformación Digital de los Ecosistemas Educativos" '
-                    'style="display:block;width:100%;height:116px;object-fit:contain;" />',
-                    unsafe_allow_html=True
-                )
-            else:
-                st.caption('Logo de investigación no disponible')
+    logo_specs = [
+        ('unam.png', 'Escudo de la UNAM', 'image/png', 'unam'),
+        ('cuaed.png', 'Logotipo de CUAED', 'image/png', 'cuaed'),
+        ('linea_investigacion.svg', 'Logotipo de la línea de investigación', 'image/svg+xml', 'linea'),
+    ]
+    if all((logos/name).exists() for name, _, _, _ in logo_specs):
+        imgs = []
+        for name, alt, mime, cls in logo_specs:
+            encoded = base64.b64encode((logos/name).read_bytes()).decode('ascii')
+            imgs.append(f'<img class="lalab-logo lalab-{cls}" src="data:{mime};base64,{encoded}" alt="{alt}" />')
+        st.markdown(
+            '<div class="lalab-logo-row">' + ''.join(imgs) + '</div>' +
+            '<style>'
+            '.lalab-logo-row{display:flex;align-items:center;justify-content:center;'
+            'gap:clamp(14px,2vw,28px);width:100%;margin:0 auto;min-height:112px;}'
+            '.lalab-logo{display:block;object-fit:contain;flex:0 1 auto;min-width:0;}'
+            '.lalab-unam{width:clamp(48px,5vw,70px);max-height:88px;}'
+            '.lalab-cuaed{width:clamp(105px,10vw,145px);max-height:86px;}'
+            '.lalab-linea{width:clamp(52px,5.2vw,76px);max-height:90px;}'
+            '@media(max-width:700px){.lalab-logo-row{gap:14px;min-height:80px;}'
+            '.lalab-unam{width:54px}.lalab-cuaed{width:116px}.lalab-linea{width:58px}}'
+            '</style>',
+            unsafe_allow_html=True
+        )
     else:
-        st.caption('Identidad institucional: emblemas pendientes')
+        st.caption('Identidad institucional: faltan archivos de logotipos en assets/')
 
 if mode=='Casos guiados':
     title, source_id, question, suggested_target = CASES[idx]
@@ -454,7 +457,7 @@ elif page=='6. Informe':
               'licencia':source.get('license','') if mode=='Casos guiados' else 'Verificar autorización del archivo',
               'reflexion':st.session_state.get('reflection','')}
     st.download_button('Descargar datos actuales (.csv)',csv_bytes(df),'datos_la_lab.csv','text/csv')
-    txt='LA-Lab v0.6.8 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
+    txt='LA-Lab v0.6.9 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
     st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v061.txt','text/plain')
     st.caption(f'Generador de informes cargado: {getattr(reporting, "REPORT_VERSION", "ANTIGUO")} · archivo: {Path(reporting.__file__).name}')
     try:
@@ -462,7 +465,7 @@ elif page=='6. Informe':
             st.error('VERSIONES INCOMPATIBLES: actualiza reporting.py junto con app.py en la raíz del repositorio y reinicia Streamlit. No se descargará un PDF antiguo.')
         else:
             pdf=build_pdf(df,metadata,ml,plot)
-            st.download_button('Descargar informe académico v0.6.8 (.pdf)',pdf,'informe_la_lab_v068.pdf','application/pdf')
+            st.download_button('Descargar informe académico v0.6.9 (.pdf)',pdf,'informe_la_lab_v068.pdf','application/pdf')
     except Exception as exc:
         st.error(f'No se pudo generar el PDF: {exc}')
     try:
