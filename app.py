@@ -1,4 +1,4 @@
-"""LA-Lab v0.6.5 — Laboratorio abierto de Analítica del Aprendizaje."""
+"""LA-Lab v0.6.7 — Laboratorio abierto de Analítica del Aprendizaje."""
 import io
 import json
 import zipfile
@@ -16,8 +16,8 @@ ROOT = Path(__file__).parent
 MAX_BYTES = 10 * 1024 * 1024
 # Catorce prácticas basadas en cinco tablas originales de cuatro colecciones UCI.
 SOURCES = {
- 'student_mat': {'name':'Student Performance — Matemáticas', 'uci_id':320, 'url':'https://archive.ics.uci.edu/dataset/320/student+performance', 'article':'Cortez, P. & Silva, A. (2008). Using Data Mining to Predict Secondary School Student Performance.', 'article_url':'https://citeseerx.ist.psu.edu/document?doi=61d468d5254730bbecf822c6b60d7d6595d9889c&repid=rep1&type=pdf', 'license':'CC BY 4.0', 'target':'G3'},
- 'student_por': {'name':'Student Performance — Portugués', 'uci_id':320, 'url':'https://archive.ics.uci.edu/dataset/320/student+performance', 'article':'Cortez, P. & Silva, A. (2008). Using Data Mining to Predict Secondary School Student Performance.', 'article_url':'https://citeseerx.ist.psu.edu/document?doi=61d468d5254730bbecf822c6b60d7d6595d9889c&repid=rep1&type=pdf', 'license':'CC BY 4.0', 'target':'G3'},
+ 'student_mat': {'name':'Student Performance — Matemáticas', 'uci_id':320, 'url':'https://archive.ics.uci.edu/dataset/320/student+performance', 'article':'Cortez, P. & Silva, A. (2008). Using Data Mining to Predict Secondary School Student Performance.', 'article_url':'https://repositorium.uminho.pt/entities/publication/42d177d6-868b-4e6c-8a89-e1e7fa41c1d0', 'license':'CC BY 4.0', 'target':'G3'},
+ 'student_por': {'name':'Student Performance — Portugués', 'uci_id':320, 'url':'https://archive.ics.uci.edu/dataset/320/student+performance', 'article':'Cortez, P. & Silva, A. (2008). Using Data Mining to Predict Secondary School Student Performance.', 'article_url':'https://repositorium.uminho.pt/entities/publication/42d177d6-868b-4e6c-8a89-e1e7fa41c1d0', 'license':'CC BY 4.0', 'target':'G3'},
  'dropout': {'name':'Predict Students Dropout and Academic Success', 'uci_id':697, 'url':'https://archive.ics.uci.edu/dataset/697/predict+students+dropout+and+academic+success', 'article':'Realinho, V., Machado, J., Baptista, L. & Martins, M. (2022). Predicting Student Dropout and Academic Success. Data, 7(11), 146.', 'article_url':'https://doi.org/10.3390/data7110146', 'license':'CC BY 4.0', 'target':'Target'},
  'mathe': {'name':'MathE — Evaluación de matemáticas en educación superior', 'uci_id':1031, 'url':'https://archive.ics.uci.edu/dataset/1031/dataset+for+assessing+mathematics+learning+in+higher+educa', 'article':'Azevedo, B. F., Pacheco, M. F., Fernandes, F. P. & Pereira, A. I. (2024). Dataset of mathematics learning and assessment of higher education students using the MathE platform. Data in Brief, 53, 110236.', 'article_url':'https://doi.org/10.1016/j.dib.2024.110236', 'license':'CC BY 4.0', 'target':'Type of Answer'},
  'higher_ed': {'name':'Higher Education Students Performance Evaluation', 'uci_id':856, 'url':'https://archive.ics.uci.edu/dataset/856/higher+education+students+performance+evaluation', 'article':'Yılmaz, N. & Şekeroğlu, B. (2020). Student Performance Classification Using Artificial Intelligence Techniques. Advances in Intelligent Systems and Computing, pp. 596–603.', 'article_url':'https://doi.org/10.1007/978-3-030-35249-3_76', 'license':'CC BY 4.0', 'target':'GRADE'},
@@ -194,7 +194,7 @@ h1,h2,h3 {letter-spacing:-.02em}
 
 with st.sidebar:
     st.title('🎓 LA-Lab')
-    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.5')
+    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.7')
     mode = st.radio('Modalidad', ['Casos guiados','Datos propios'],key='mode')
     idx = None
     if mode == 'Casos guiados':
@@ -209,6 +209,10 @@ with header_left:
     st.title('🎓 LA-Lab')
     st.caption('Tecnologías Inteligentes para la Transformación Digital de los Ecosistemas Educativos')
     st.caption('Dr. Derlis Hernández Lara · CUAED · Universidad Nacional Autónoma de México')
+    research_logo = ROOT/'assets'/'linea_investigacion.svg'
+    if research_logo.exists():
+        with st.expander('Ver figura de la línea de investigación'):
+            st.image(str(research_logo), caption='Tecnologías Inteligentes para la Transformación Digital de los Ecosistemas Educativos', width=420)
 with header_right:
     st.markdown("<div style='height:58px'></div>", unsafe_allow_html=True)
     logos = ROOT/'assets'
@@ -440,7 +444,7 @@ elif page=='6. Informe':
               'licencia':source.get('license','') if mode=='Casos guiados' else 'Verificar autorización del archivo',
               'reflexion':st.session_state.get('reflection','')}
     st.download_button('Descargar datos actuales (.csv)',csv_bytes(df),'datos_la_lab.csv','text/csv')
-    txt='LA-Lab v0.6.5 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
+    txt='LA-Lab v0.6.7 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
     st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v061.txt','text/plain')
     st.caption(f'Generador de informes cargado: {getattr(reporting, "REPORT_VERSION", "ANTIGUO")} · archivo: {Path(reporting.__file__).name}')
     try:
@@ -448,7 +452,7 @@ elif page=='6. Informe':
             st.error('VERSIONES INCOMPATIBLES: actualiza reporting.py junto con app.py en la raíz del repositorio y reinicia Streamlit. No se descargará un PDF antiguo.')
         else:
             pdf=build_pdf(df,metadata,ml,plot)
-            st.download_button('Descargar informe académico v0.6.5 (.pdf)',pdf,'informe_la_lab_v065.pdf','application/pdf')
+            st.download_button('Descargar informe académico v0.6.7 (.pdf)',pdf,'informe_la_lab_v067.pdf','application/pdf')
     except Exception as exc:
         st.error(f'No se pudo generar el PDF: {exc}')
     try:
