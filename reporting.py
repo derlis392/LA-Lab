@@ -1,5 +1,5 @@
 """LA-Lab: reportes reproducibles y narrativas cautelosas para educación."""
-REPORT_VERSION = "0.6.12"
+REPORT_VERSION = "0.6.13"
 import io
 from datetime import datetime
 from xml.sax.saxutils import escape
@@ -232,38 +232,22 @@ def build_pdf(df,meta,ml=None,plot=None):
             story.append(KeepTogether([Image(png,width=w*scale,height=h*scale),Paragraph(escape(caption),styles['LabBody'])]))
     from pathlib import Path
     assets=Path(__file__).resolve().parent/'assets'
-    # Incrustar los tres emblemas de manera independiente. El SVG TITDEE tiene
-    # una página A4 con márgenes transparentes: recortar por canal alfa evita
-    # que parezca diminuto o desaparezca en el informe.
-    logo_specs=[('unam.png',2.1*cm,2.0*cm),('cuaed.png',4.6*cm,1.75*cm),('linea_investigacion.svg',2.1*cm,2.0*cm)]
+    # El SVG permanece disponible para la web. En el PDF se usa una versión
+    # PNG preconvertida y recortada, sin depender de Cairo en Streamlit Cloud.
+    logo_specs=[('unam.png',2.1*cm,2.0*cm),('cuaed.png',4.6*cm,1.75*cm),('linea_investigacion_pdf.png',2.1*cm,2.0*cm)]
     logo_cells=[]
+    from PIL import Image as PILImage
     for filename,max_width,max_height in logo_specs:
         path=assets/filename
         if not path.exists():
             raise FileNotFoundError(f'Falta el emblema requerido para el PDF: {path}')
-        from PIL import Image as PILImage
-        if path.suffix.lower()=='.svg':
-            try:
-                import cairosvg
-                png=cairosvg.svg2png(url=str(path),output_width=1600)
-                rgba=PILImage.open(io.BytesIO(png)).convert('RGBA')
-                bbox=rgba.getchannel('A').getbbox()
-                if not bbox:
-                    raise ValueError('SVG sin contenido visible')
-                rgba=rgba.crop(bbox)
-                # Guardar el recorte en memoria a alta resolución.
-                output=io.BytesIO();rgba.save(output,format='PNG');output.seek(0)
-                iw,ih=rgba.size;source=output
-            except Exception as exc:
-                raise RuntimeError(f'No fue posible convertir el emblema TITDEE a PDF: {exc}') from exc
-        else:
-            iw,ih=PILImage.open(path).size;source=str(path)
+        iw,ih=PILImage.open(path).size
         factor=min(max_width/iw,max_height/ih)
-        logo_cells.append(Image(source,width=iw*factor,height=ih*factor))
+        logo_cells.append(Image(str(path),width=iw*factor,height=ih*factor))
     logo_table=Table([logo_cells],hAlign='CENTER',colWidths=[3.7*cm,6.3*cm,3.7*cm])
     logo_table.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'MIDDLE'),('ALIGN',(0,0),(-1,-1),'CENTER'),('LEFTPADDING',(0,0),(-1,-1),4),('RIGHTPADDING',(0,0),(-1,-1),4)]))
     story.append(logo_table);story.append(Spacer(1,7))
-    story.append(Paragraph('LA-Lab v0.6.12 | Informe académico de analítica del aprendizaje',styles['LabTitle']))
+    story.append(Paragraph('LA-Lab v0.6.13 | Informe académico de analítica del aprendizaje',styles['LabTitle']))
     para('Caso: '+meta['caso']);para('Generado: '+datetime.now().strftime('%Y-%m-%d %H:%M')+' | Documento exploratorio; revisión humana requerida')
     heading('1. Propósito y procedencia')
     para('Pregunta de investigación del caso: '+meta['pregunta']);para('Fuente: '+meta['fuente']);para('Licencia declarada: '+meta['licencia'])
@@ -356,7 +340,7 @@ def build_pdf(df,meta,ml=None,plot=None):
         except importlib.metadata.PackageNotFoundError:pass
     para('Entorno: Python '+platform.python_version()+'; '+ '; '.join(versions)+'. Versión de LA-Lab: '+REPORT_VERSION+'.')
     def footer(canvas,doc):
-        canvas.setFont('Helvetica',8);canvas.setFillColor(colors.grey);canvas.drawString(1.8*cm,1.1*cm,'LA-Lab v0.6.12 · Informe exploratorio · No tomar decisiones automatizadas sobre estudiantes');canvas.drawRightString(19.2*cm,1.1*cm,str(doc.page))
+        canvas.setFont('Helvetica',8);canvas.setFillColor(colors.grey);canvas.drawString(1.8*cm,1.1*cm,'LA-Lab v0.6.13 · Informe exploratorio · No tomar decisiones automatizadas sobre estudiantes');canvas.drawRightString(19.2*cm,1.1*cm,str(doc.page))
     doc.build(story,onFirstPage=footer,onLaterPages=footer);return buf.getvalue()
 
 

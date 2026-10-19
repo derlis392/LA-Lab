@@ -1,4 +1,4 @@
-# LA-Lab v0.6.12 — dependencias para Streamlit Community Cloud (Python 3.11–3.13 recomendado)
+# LA-Lab v0.6.13 — dependencias para Streamlit Community Cloud (Python 3.11–3.13 recomendado)
 # MathE se incluye en data/mathe_original.csv (CSV original UCI convertido a UTF-8).
 # ucimlrepo permanece para otras fuentes; carga libre limitada a 10 MB.
 streamlit>=1.40,<2
@@ -14,4 +14,4 @@ reportlab>=4.0,<5
 matplotlib>=3.8,<4
 Pillow>=10,<13
 
-cairosvg>=2.7,<3
+
