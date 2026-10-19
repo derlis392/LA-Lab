@@ -1,5 +1,5 @@
 """LA-Lab: reportes reproducibles y narrativas cautelosas para educación."""
-REPORT_VERSION = "0.6.11"
+REPORT_VERSION = "0.6.12"
 import io
 from datetime import datetime
 from xml.sax.saxutils import escape
@@ -87,15 +87,15 @@ def _chart_image(df,plot,ml,which):
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
-    fig,ax=plt.subplots(figsize=(8,4.3),dpi=120)
+    fig,ax=plt.subplots(figsize=(8,5.2) if which=='correlation' else (8,4.3),dpi=150)
     if which=='correlation':
         cols=list(df.select_dtypes(include='number').columns[:10])
         target=ml.get('objetivo') if ml else None
         if target in df.select_dtypes(include='number') and target not in cols: cols=cols[:9]+[target]
         if len(cols)<2:plt.close(fig);return None
         corr=df[cols].corr();im=ax.imshow(corr,vmin=-1,vmax=1,cmap='coolwarm')
-        ax.set_xticks(range(len(cols)),cols,rotation=65,ha='right',fontsize=7)
-        ax.set_yticks(range(len(cols)),cols,fontsize=7);fig.colorbar(im,ax=ax,fraction=.04,pad=.02)
+        ax.set_xticks(range(len(cols)),cols,rotation=45,ha='right',fontsize=9)
+        ax.set_yticks(range(len(cols)),cols,fontsize=9);fig.colorbar(im,ax=ax,fraction=.04,pad=.02);fig.subplots_adjust(left=.19,right=.86,bottom=.22,top=.89)
         ax.set_title('Matriz de correlación (Pearson)')
     elif which=='overview':
         numeric=df.select_dtypes(include='number').columns
@@ -211,10 +211,10 @@ def build_pdf(df,meta,ml=None,plot=None):
     from reportlab.lib.enums import TA_CENTER
     from reportlab.lib.units import cm
     from reportlab.lib.pagesizes import A4
-    buf=io.BytesIO();doc=SimpleDocTemplate(buf,pagesize=A4,leftMargin=1.8*cm,rightMargin=1.8*cm,topMargin=1.7*cm,bottomMargin=1.8*cm)
+    buf=io.BytesIO();doc=SimpleDocTemplate(buf,pagesize=A4,leftMargin=1.8*cm,rightMargin=1.8*cm,topMargin=1.45*cm,bottomMargin=1.45*cm)
     styles=getSampleStyleSheet();styles.add(ParagraphStyle(name='LabTitle',parent=styles['Title'],fontSize=19,leading=23,textColor=colors.HexColor('#15375b'),spaceAfter=14))
-    styles.add(ParagraphStyle(name='LabBody',parent=styles['BodyText'],fontSize=9.5,leading=14,spaceAfter=8))
-    styles.add(ParagraphStyle(name='LabH',parent=styles['Heading2'],textColor=colors.HexColor('#15375b'),spaceBefore=13,spaceAfter=7,keepWithNext=True))
+    styles.add(ParagraphStyle(name='LabBody',parent=styles['BodyText'],fontSize=9.2,leading=12.5,spaceAfter=5))
+    styles.add(ParagraphStyle(name='LabH',parent=styles['Heading2'],textColor=colors.HexColor('#15375b'),spaceBefore=10,spaceAfter=5,keepWithNext=True))
     story=[]
     def para(text):story.append(Paragraph(escape(str(text)).replace('\n','<br/>'),styles['LabBody']))
     def heading(text):story.append(CondPageBreak(2.3*cm));story.append(Paragraph(escape(text),styles['LabH']))
@@ -222,47 +222,54 @@ def build_pdf(df,meta,ml=None,plot=None):
         cells=[[Paragraph(escape(str(x)),styles['LabBody']) for x in row] for row in rows]
         t=Table(cells,repeatRows=1,hAlign='LEFT',colWidths=None,splitByRow=1)
         t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#e7eef6')),('GRID',(0,0),(-1,-1),.25,colors.HexColor('#cbd5e1')),('VALIGN',(0,0),(-1,-1),'TOP'),('ROWBACKGROUNDS',(0,1),(-1,-1),[colors.white,colors.HexColor('#f7f9fc')]),('LEFTPADDING',(0,0),(-1,-1),6),('RIGHTPADDING',(0,0),(-1,-1),6)]))
-        story.append(t);story.append(Spacer(1,9))
+        story.append(t);story.append(Spacer(1,6))
     def figure(which,caption):
         png=_chart_image(df,plot,ml,which)
         if png:
             from PIL import Image as PILImage
-            im=PILImage.open(png);w,h=im.size; maxw=16.5*cm;maxh=6.8*cm;scale=min(maxw/w,maxh/h)
+            im=PILImage.open(png);w,h=im.size; maxw=16.5*cm;maxh=(7.8 if which=='correlation' else 6.3)*cm;scale=min(maxw/w,maxh/h)
             png.seek(0)
             story.append(KeepTogether([Image(png,width=w*scale,height=h*scale),Paragraph(escape(caption),styles['LabBody'])]))
     from pathlib import Path
     assets=Path(__file__).resolve().parent/'assets'
+    # Incrustar los tres emblemas de manera independiente. El SVG TITDEE tiene
+    # una página A4 con márgenes transparentes: recortar por canal alfa evita
+    # que parezca diminuto o desaparezca en el informe.
+    logo_specs=[('unam.png',2.1*cm,2.0*cm),('cuaed.png',4.6*cm,1.75*cm),('linea_investigacion.svg',2.1*cm,2.0*cm)]
     logo_cells=[]
-    logo_specs=[('unam.png',2.0*cm,2.0*cm),('cuaed.png',5.0*cm,1.8*cm),('linea_investigacion.svg',2.3*cm,2.0*cm)]
-    for file,max_width,max_height in logo_specs:
-        path=assets/file
-        if not path.exists():continue
+    for filename,max_width,max_height in logo_specs:
+        path=assets/filename
+        if not path.exists():
+            raise FileNotFoundError(f'Falta el emblema requerido para el PDF: {path}')
         from PIL import Image as PILImage
         if path.suffix.lower()=='.svg':
-            # Rasterización a alta resolución únicamente para incrustar en PDF.
-            # Se conserva el SVG original en assets y en la interfaz web.
             try:
                 import cairosvg
-                rendered=io.BytesIO(cairosvg.svg2png(url=str(path),output_width=900))
-                iw,ih=PILImage.open(rendered).size;rendered.seek(0)
-                source=rendered
-            except Exception:
-                continue
+                png=cairosvg.svg2png(url=str(path),output_width=1600)
+                rgba=PILImage.open(io.BytesIO(png)).convert('RGBA')
+                bbox=rgba.getchannel('A').getbbox()
+                if not bbox:
+                    raise ValueError('SVG sin contenido visible')
+                rgba=rgba.crop(bbox)
+                # Guardar el recorte en memoria a alta resolución.
+                output=io.BytesIO();rgba.save(output,format='PNG');output.seek(0)
+                iw,ih=rgba.size;source=output
+            except Exception as exc:
+                raise RuntimeError(f'No fue posible convertir el emblema TITDEE a PDF: {exc}') from exc
         else:
             iw,ih=PILImage.open(path).size;source=str(path)
         factor=min(max_width/iw,max_height/ih)
         logo_cells.append(Image(source,width=iw*factor,height=ih*factor))
-    if logo_cells:
-        logo_table=Table([logo_cells],hAlign='CENTER',colWidths=[3.2*cm,6.5*cm,3.2*cm][:len(logo_cells)])
-        logo_table.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'MIDDLE'),('ALIGN',(0,0),(-1,-1),'CENTER'),('LEFTPADDING',(0,0),(-1,-1),5),('RIGHTPADDING',(0,0),(-1,-1),5)]))
-        story.append(logo_table);story.append(Spacer(1,12))
-    story.append(Paragraph('LA-Lab v0.6.11 | Informe académico de analítica del aprendizaje',styles['LabTitle']))
+    logo_table=Table([logo_cells],hAlign='CENTER',colWidths=[3.7*cm,6.3*cm,3.7*cm])
+    logo_table.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'MIDDLE'),('ALIGN',(0,0),(-1,-1),'CENTER'),('LEFTPADDING',(0,0),(-1,-1),4),('RIGHTPADDING',(0,0),(-1,-1),4)]))
+    story.append(logo_table);story.append(Spacer(1,7))
+    story.append(Paragraph('LA-Lab v0.6.12 | Informe académico de analítica del aprendizaje',styles['LabTitle']))
     para('Caso: '+meta['caso']);para('Generado: '+datetime.now().strftime('%Y-%m-%d %H:%M')+' | Documento exploratorio; revisión humana requerida')
     heading('1. Propósito y procedencia')
     para('Pregunta de investigación del caso: '+meta['pregunta']);para('Fuente: '+meta['fuente']);para('Licencia declarada: '+meta['licencia'])
     if ml and ml.get('objetivo')=='G3' and 'evaluacion' in __import__('unicodedata').normalize('NFKD',meta['pregunta'].lower()).encode('ascii','ignore').decode('ascii') and not {'G1','G2'}.intersection(ml.get('variables',[])):
         para('Nota de alcance: la pregunta general menciona evaluaciones, pero este experimento no incluye G1 ni G2. Sus resultados describen la asociación predictiva de las variables seleccionadas con G3; no responden directamente a la relación entre evaluaciones.')
-    heading('2. Comprensión y calidad de datos');para(describe_data(df,meta['pregunta'],ml.get('objetivo') if ml else None));para('Alcance del experimento: '+research_note(meta,ml))
+    heading('2. Comprensión y calidad de datos');para(describe_data(df,meta['pregunta'],ml.get('objetivo') if ml else None))
     para('Transformaciones manuales registradas: '+str(meta['limpieza']).rstrip('.'))
     numeric=df.select_dtypes(include='number');
     if not numeric.empty:
@@ -349,7 +356,7 @@ def build_pdf(df,meta,ml=None,plot=None):
         except importlib.metadata.PackageNotFoundError:pass
     para('Entorno: Python '+platform.python_version()+'; '+ '; '.join(versions)+'. Versión de LA-Lab: '+REPORT_VERSION+'.')
     def footer(canvas,doc):
-        canvas.setFont('Helvetica',8);canvas.setFillColor(colors.grey);canvas.drawString(1.8*cm,1.1*cm,'LA-Lab v0.6.11 · Informe exploratorio · No tomar decisiones automatizadas sobre estudiantes');canvas.drawRightString(19.2*cm,1.1*cm,str(doc.page))
+        canvas.setFont('Helvetica',8);canvas.setFillColor(colors.grey);canvas.drawString(1.8*cm,1.1*cm,'LA-Lab v0.6.12 · Informe exploratorio · No tomar decisiones automatizadas sobre estudiantes');canvas.drawRightString(19.2*cm,1.1*cm,str(doc.page))
     doc.build(story,onFirstPage=footer,onLaterPages=footer);return buf.getvalue()
 
 

@@ -1,4 +1,4 @@
-"""LA-Lab v0.6.11 — Laboratorio abierto de Analítica del Aprendizaje."""
+"""LA-Lab v0.6.12 — Laboratorio abierto de Analítica del Aprendizaje."""
 import io
 import json
 import zipfile
@@ -195,7 +195,7 @@ h1,h2,h3 {letter-spacing:-.02em}
 
 with st.sidebar:
     st.title('🎓 LA-Lab')
-    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.11')
+    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.12')
     mode = st.radio('Modalidad', ['Casos guiados','Datos propios'],key='mode')
     idx = None
     if mode == 'Casos guiados':
@@ -457,20 +457,20 @@ elif page=='7. Informe':
               'licencia':source.get('license','') if mode=='Casos guiados' else 'Verificar autorización del archivo',
               'reflexion':st.session_state.get('reflection','')}
     st.download_button('Descargar datos actuales (.csv)',csv_bytes(df),'datos_la_lab.csv','text/csv')
-    txt='LA-Lab v0.6.11 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
-    st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v0611.txt','text/plain')
+    txt='LA-Lab v0.6.12 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
+    st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v0612.txt','text/plain')
     st.caption(f'Generador de informes cargado: {getattr(reporting, "REPORT_VERSION", "ANTIGUO")} · archivo: {Path(reporting.__file__).name}')
     try:
-        if getattr(reporting, 'REPORT_VERSION', None) != '0.6.11':
+        if getattr(reporting, 'REPORT_VERSION', None) != '0.6.12':
             st.error('VERSIONES INCOMPATIBLES: actualiza reporting.py junto con app.py en la raíz del repositorio y reinicia Streamlit. No se descargará un PDF antiguo.')
         else:
             pdf=build_pdf(df,metadata,ml,plot)
-            st.download_button('Descargar informe académico v0.6.11 (.pdf)',pdf,'informe_la_lab_v0611.pdf','application/pdf')
+            st.download_button('Descargar informe académico v0.6.12 (.pdf)',pdf,'informe_la_lab_v0612.pdf','application/pdf')
     except Exception as exc:
         st.error(f'No se pudo generar el PDF: {exc}')
     try:
         xlsx=build_excel(df,metadata,ml)
-        st.download_button('Descargar libro de análisis (.xlsx)',xlsx,'analisis_la_lab_v0611.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        st.download_button('Descargar libro de análisis (.xlsx)',xlsx,'analisis_la_lab_v0612.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     except Exception as exc:
         st.error(f'No se pudo generar el Excel: {exc}')
     text_box('El informe incorpora análisis registrados, visualizaciones reproducibles, interpretación y sugerencias condicionadas. Las recomendaciones requieren revisión humana y no constituyen diagnóstico individual.')
@@ -695,4 +695,4 @@ elif page=='6. Minería de datos':
             st.error(f'No fue posible ejecutar el modelo: {ex}')
 
 st.divider()
-st.caption('LA-Lab v0.6.11 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
+st.caption('LA-Lab v0.6.12 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
