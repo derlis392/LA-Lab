@@ -1,5 +1,5 @@
 """LA-Lab: reportes reproducibles y narrativas cautelosas para educación."""
-REPORT_VERSION = "0.6.10"
+REPORT_VERSION = "0.6.11"
 import io
 from datetime import datetime
 from xml.sax.saxutils import escape
@@ -154,8 +154,58 @@ def _chart_image(df,plot,ml,which):
     fig.tight_layout();buf=io.BytesIO();fig.savefig(buf,format='png',dpi=125,bbox_inches='tight');plt.close(fig);buf.seek(0);return buf
 
 
+# Diccionario interpretativo limitado a variables documentadas de Student Performance.
+STUDENT_VARIABLES = {
+ 'school':('Escuela de procedencia','Nominal','GP/MS'),
+ 'sex':('Sexo registrado','Nominal','F/M'),
+ 'age':('Edad','Cuantitativa','Años'),
+ 'address':('Tipo de residencia','Nominal','U/R'),
+ 'famsize':('Tamaño del hogar','Nominal','LE3/GT3'),
+ 'Pstatus':('Situación de convivencia parental','Nominal','T/A'),
+ 'Medu':('Escolaridad materna','Ordinal','0–4'),
+ 'Fedu':('Escolaridad paterna','Ordinal','0–4'),
+ 'Mjob':('Ocupación materna','Nominal','Categorías UCI'),
+ 'Fjob':('Ocupación paterna','Nominal','Categorías UCI'),
+ 'reason':('Motivo de elección de escuela','Nominal','Categorías UCI'),
+ 'guardian':('Tutor responsable','Nominal','Categorías UCI'),
+ 'traveltime':('Tiempo de traslado','Ordinal','1–4'),
+ 'studytime':('Tiempo semanal de estudio','Ordinal','1–4'),
+ 'failures':('Reprobaciones previas','Conteo codificado','0–3; 3 puede indicar 3 o más'),
+ 'schoolsup':('Apoyo educativo escolar','Binaria','yes/no'),
+ 'famsup':('Apoyo educativo familiar','Binaria','yes/no'),
+ 'paid':('Clases adicionales pagadas','Binaria','yes/no'),
+ 'activities':('Actividades extracurriculares','Binaria','yes/no'),
+ 'nursery':('Asistió a educación preescolar','Binaria','yes/no'),
+ 'higher':('Desea educación superior','Binaria','yes/no'),
+ 'internet':('Acceso a Internet en casa','Binaria','yes/no'),
+ 'romantic':('Relación romántica registrada','Binaria','yes/no'),
+ 'famrel':('Calidad de relaciones familiares','Ordinal','1–5'),
+ 'freetime':('Tiempo libre después de escuela','Ordinal','1–5'),
+ 'goout':('Frecuencia de salidas','Ordinal','1–5'),
+ 'Dalc':('Consumo de alcohol entre semana','Ordinal','1–5'),
+ 'Walc':('Consumo de alcohol en fin de semana','Ordinal','1–5'),
+ 'health':('Estado de salud autopercibido','Ordinal','1–5'),
+ 'absences':('Número de ausencias escolares','Conteo','Días registrados'),
+ 'G1':('Calificación del primer periodo','Cuantitativa','0–20'),
+ 'G2':('Calificación del segundo periodo','Cuantitativa','0–20'),
+ 'G3':('Calificación final','Cuantitativa','0–20')
+}
+def variable_dictionary(df, meta):
+    is_student='Student Performance' in str(meta.get('fuente',''))
+    return [{'Variable':c,'Significado':STUDENT_VARIABLES[c][0] if is_student and c in STUDENT_VARIABLES else 'Consultar diccionario original',
+             'Tipo conceptual':STUDENT_VARIABLES[c][1] if is_student and c in STUDENT_VARIABLES else ('Numérica sin escala validada' if pd.api.types.is_numeric_dtype(df[c]) else 'Categoría sin escala validada'),
+             'Escala / valores':STUDENT_VARIABLES[c][2] if is_student and c in STUDENT_VARIABLES else 'Ver documentación de la fuente'} for c in df.columns]
+
+def research_note(meta, ml):
+    if not ml:return 'No se ejecutó minería de datos; la pregunta orientadora permanece como guía exploratoria.'
+    vars=set(ml.get('variables',[])); target=ml.get('objetivo')
+    if 'Student Performance' in str(meta.get('fuente','')) and target=='G3':
+        if vars.intersection({'G1','G2'}):return 'El modelo incluye calificaciones de periodos anteriores: sus resultados corresponden a un escenario posterior a esas evaluaciones, no a una predicción inicial del curso.'
+        return 'La pregunta orientadora se refiere a evaluaciones y calificación final, pero el modelo no incorpora G1 ni G2. El experimento solo estima la relación predictiva de los predictores seleccionados con G3.'
+    return 'La pregunta orientadora y el experimento configurado deben contrastarse antes de derivar conclusiones educativas.'
+
 def build_pdf(df,meta,ml=None,plot=None):
-    from reportlab.platypus import SimpleDocTemplate,Paragraph,Spacer,Image,Table,TableStyle,KeepTogether,CondPageBreak
+    from reportlab.platypus import SimpleDocTemplate,Paragraph,Spacer,Image,Table,TableStyle,KeepTogether,CondPageBreak,KeepInFrame
     from reportlab.lib.styles import getSampleStyleSheet,ParagraphStyle
     from reportlab.lib import colors
     from reportlab.lib.enums import TA_CENTER
@@ -170,7 +220,7 @@ def build_pdf(df,meta,ml=None,plot=None):
     def heading(text):story.append(CondPageBreak(2.3*cm));story.append(Paragraph(escape(text),styles['LabH']))
     def table(rows):
         cells=[[Paragraph(escape(str(x)),styles['LabBody']) for x in row] for row in rows]
-        t=Table(cells,repeatRows=1,hAlign='LEFT',colWidths=None)
+        t=Table(cells,repeatRows=1,hAlign='LEFT',colWidths=None,splitByRow=1)
         t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#e7eef6')),('GRID',(0,0),(-1,-1),.25,colors.HexColor('#cbd5e1')),('VALIGN',(0,0),(-1,-1),'TOP'),('ROWBACKGROUNDS',(0,1),(-1,-1),[colors.white,colors.HexColor('#f7f9fc')]),('LEFTPADDING',(0,0),(-1,-1),6),('RIGHTPADDING',(0,0),(-1,-1),6)]))
         story.append(t);story.append(Spacer(1,9))
     def figure(which,caption):
@@ -183,27 +233,47 @@ def build_pdf(df,meta,ml=None,plot=None):
     from pathlib import Path
     assets=Path(__file__).resolve().parent/'assets'
     logo_cells=[]
-    for file, max_width, max_height in [('unam.png',2.1*cm,2.1*cm),('cuaed.png',5.4*cm,2.0*cm)]:
+    logo_specs=[('unam.png',2.0*cm,2.0*cm),('cuaed.png',5.0*cm,1.8*cm),('linea_investigacion.svg',2.3*cm,2.0*cm)]
+    for file,max_width,max_height in logo_specs:
         path=assets/file
-        if path.exists():
-            from PIL import Image as PILImage
-            iw,ih=PILImage.open(path).size; factor=min(max_width/iw,max_height/ih)
-            logo_cells.append(Image(str(path),width=iw*factor,height=ih*factor))
+        if not path.exists():continue
+        from PIL import Image as PILImage
+        if path.suffix.lower()=='.svg':
+            # Rasterización a alta resolución únicamente para incrustar en PDF.
+            # Se conserva el SVG original en assets y en la interfaz web.
+            try:
+                import cairosvg
+                rendered=io.BytesIO(cairosvg.svg2png(url=str(path),output_width=900))
+                iw,ih=PILImage.open(rendered).size;rendered.seek(0)
+                source=rendered
+            except Exception:
+                continue
+        else:
+            iw,ih=PILImage.open(path).size;source=str(path)
+        factor=min(max_width/iw,max_height/ih)
+        logo_cells.append(Image(source,width=iw*factor,height=ih*factor))
     if logo_cells:
-        logo_table=Table([[logo_cells[0],logo_cells[1]]] if len(logo_cells)==2 else [logo_cells],hAlign='LEFT',colWidths=[3*cm,12*cm] if len(logo_cells)==2 else None)
+        logo_table=Table([logo_cells],hAlign='CENTER',colWidths=[3.2*cm,6.5*cm,3.2*cm][:len(logo_cells)])
+        logo_table.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'MIDDLE'),('ALIGN',(0,0),(-1,-1),'CENTER'),('LEFTPADDING',(0,0),(-1,-1),5),('RIGHTPADDING',(0,0),(-1,-1),5)]))
         story.append(logo_table);story.append(Spacer(1,12))
-    story.append(Paragraph('LA-Lab v0.6.10 | Informe académico de analítica del aprendizaje',styles['LabTitle']))
+    story.append(Paragraph('LA-Lab v0.6.11 | Informe académico de analítica del aprendizaje',styles['LabTitle']))
     para('Caso: '+meta['caso']);para('Generado: '+datetime.now().strftime('%Y-%m-%d %H:%M')+' | Documento exploratorio; revisión humana requerida')
     heading('1. Propósito y procedencia')
     para('Pregunta de investigación del caso: '+meta['pregunta']);para('Fuente: '+meta['fuente']);para('Licencia declarada: '+meta['licencia'])
     if ml and ml.get('objetivo')=='G3' and 'evaluacion' in __import__('unicodedata').normalize('NFKD',meta['pregunta'].lower()).encode('ascii','ignore').decode('ascii') and not {'G1','G2'}.intersection(ml.get('variables',[])):
         para('Nota de alcance: la pregunta general menciona evaluaciones, pero este experimento no incluye G1 ni G2. Sus resultados describen la asociación predictiva de las variables seleccionadas con G3; no responden directamente a la relación entre evaluaciones.')
-    heading('2. Comprensión y calidad de datos');para(describe_data(df,meta['pregunta'],ml.get('objetivo') if ml else None))
+    heading('2. Comprensión y calidad de datos');para(describe_data(df,meta['pregunta'],ml.get('objetivo') if ml else None));para('Alcance del experimento: '+research_note(meta,ml))
     para('Transformaciones manuales registradas: '+str(meta['limpieza']).rstrip('.'))
     numeric=df.select_dtypes(include='number');
     if not numeric.empty:
         stat=numeric.describe().T[['mean','std','min','50%','max']].head(12)
         table([['Variable','Media','DE','Mín.','Mediana','Máx.']]+[[str(k)]+[f'{v:.2f}' for v in row] for k,row in stat.iterrows()])
+    para('Advertencia sobre escalas: las medias y las correlaciones de Pearson de variables ordinales codificadas (por ejemplo, Medu, Fedu, studytime y health) requieren cautela; los códigos no son intervalos necesariamente equivalentes.')
+    heading('2.1 Diccionario de variables (selección)')
+    dictionary=variable_dictionary(df,meta)
+    important={'age','Medu','Fedu','studytime','failures','absences','G1','G2','G3'}
+    selected_dict=[row for row in dictionary if row['Variable'] in important] if 'Student Performance' in str(meta.get('fuente','')) else dictionary[:8]
+    if selected_dict:table([['Variable','Significado','Tipo','Escala']]+[[d['Variable'],d['Significado'],d['Tipo conceptual'],d['Escala / valores']] for d in selected_dict])
     heading('3. Visualización e interpretación exploratoria')
     selected = plot.get('x') if plot else None
     overview_var = (ml.get('objetivo') if ml else None) or (str(numeric.columns[0]) if len(numeric.columns) else str(df.columns[0]))
@@ -236,6 +306,7 @@ def build_pdf(df,meta,ml=None,plot=None):
         figure('ml_primary',{'Regresión':'Valores reales frente a predicciones. La línea diagonal indica predicción perfecta.','Clasificación':'Matriz de confusión: filas reales, columnas predichas; examine errores de cada clase.','Agrupamiento':'Proyección PCA de grupos: la separación visual no valida perfiles.'}[ml['tarea']])
         figure('ml_secondary',{'Regresión':'Residuos: los errores grandes o patrones sistemáticos requieren revisión.','Clasificación':'Precisión, recall y F1 por clase: contraste el rendimiento minoritario.','Agrupamiento':'Comparación de silhouette por k o distribución de tamaños de grupos.'}[ml['tarea']])
         if ml.get('comparacion'):
+            story.append(CondPageBreak(7.0*cm))
             heading('4.1 Comparación exploratoria de algoritmos')
             para('Las métricas de esta comparación se calcularon sobre el mismo conjunto de prueba únicamente para ilustración. No deben utilizarse para elegir el algoritmo ganador; la selección formal requiere validación cruzada dentro del conjunto de entrenamiento y evaluación final única sobre prueba.')
             rows=ml['comparacion'];keys=list(rows[0]);table([keys]+[[f'{r[k]:.3f}' if isinstance(r[k],(int,float)) else str(r[k]) for k in keys] for r in rows]);figure('comparison','Comparación de algoritmos según la métrica principal del experimento.')
@@ -247,11 +318,13 @@ def build_pdf(df,meta,ml=None,plot=None):
         else:para('Silhouette compara cohesión y separación de grupos; valores próximos a cero sugieren superposición. La elección de k exige también estabilidad, interpretabilidad y justificación educativa.')
     else:para('No se registró un experimento de minería de datos en esta sesión. No se reportan métricas ni conclusiones no ejecutadas.')
     heading('6. Recomendaciones y limitaciones')
+    para('Interpretación del alcance: '+research_note(meta,ml))
     para('Recomendación docente: formular hipótesis verificables a partir de los patrones observados, contrastar explicaciones alternativas y documentar el contexto, la temporalidad y las escalas de las variables. Utilizar el informe como evidencia de una práctica de análisis, no como diagnóstico automático.')
     para('Limitaciones: el análisis exploratorio no demuestra causalidad; los resultados de una sola partición no acreditan generalización externa. Las variables de rendimiento pueden estar temporalmente relacionadas y producir fuga de información. Los conjuntos educativos requieren controles de privacidad, representatividad y revisión ética.')
     if meta.get('reflexion'):heading('Reflexión de la persona participante');para(meta['reflexion'])
     heading('7. Fuentes, referencias y reproducibilidad')
     para('Conjunto de datos: '+str(meta.get('fuente','No especificado')))
+    para('Diccionario de variables: definiciones del caso incluidas en la sección 2.1 y en el libro Excel.')
     if meta.get('fuente_url'):para('Repositorio y descarga original: '+str(meta['fuente_url']))
     para('Licencia declarada: '+str(meta.get('licencia','No especificada; verificar condiciones de uso')))
     if meta.get('articulo'):para('Publicación de referencia: '+str(meta['articulo']))
@@ -276,7 +349,7 @@ def build_pdf(df,meta,ml=None,plot=None):
         except importlib.metadata.PackageNotFoundError:pass
     para('Entorno: Python '+platform.python_version()+'; '+ '; '.join(versions)+'. Versión de LA-Lab: '+REPORT_VERSION+'.')
     def footer(canvas,doc):
-        canvas.setFont('Helvetica',8);canvas.setFillColor(colors.grey);canvas.drawString(1.8*cm,1.1*cm,'LA-Lab v0.6.10 · Informe exploratorio · No tomar decisiones automatizadas sobre estudiantes');canvas.drawRightString(19.2*cm,1.1*cm,str(doc.page))
+        canvas.setFont('Helvetica',8);canvas.setFillColor(colors.grey);canvas.drawString(1.8*cm,1.1*cm,'LA-Lab v0.6.11 · Informe exploratorio · No tomar decisiones automatizadas sobre estudiantes');canvas.drawRightString(19.2*cm,1.1*cm,str(doc.page))
     doc.build(story,onFirstPage=footer,onLaterPages=footer);return buf.getvalue()
 
 
@@ -300,6 +373,27 @@ def build_excel(df,meta,ml=None):
             if ml.get('perfiles'):pd.DataFrame(ml['perfiles']).to_excel(writer,sheet_name='Perfiles',index=False)
             if ml.get('comparacion_k'):pd.DataFrame(ml['comparacion_k']).to_excel(writer,sheet_name='Seleccion_k',index=False)
             pd.DataFrame({'Interpretacion':[explain_ml(ml)]}).to_excel(writer,sheet_name='Interpretacion',index=False)
+        pd.DataFrame(variable_dictionary(df,meta)).to_excel(writer,sheet_name='Diccionario',index=False)
+        import hashlib,platform,importlib.metadata
+        fingerprint=hashlib.sha256(pd.util.hash_pandas_object(df,index=True).values.tobytes()).hexdigest()[:16]
+        details=[('Versión LA-Lab',REPORT_VERSION),('Fecha de exportación',datetime.now().isoformat(timespec='seconds')),
+                 ('Hash abreviado de filas',fingerprint),('Número de filas',len(df)),('Número de columnas',len(df.columns)),
+                 ('Versión Python',platform.python_version()),('Pregunta del caso',meta.get('pregunta','')),
+                 ('Alcance de resultados',research_note(meta,ml)),('Limitación','Análisis observacional; no implica causalidad ni permite decisiones automatizadas.')]
+        for pkg in ['pandas','numpy','scikit-learn','streamlit']:
+            try:details.append(('Paquete '+pkg,importlib.metadata.version(pkg)))
+            except importlib.metadata.PackageNotFoundError:pass
+        if ml:
+            for key in ['tarea','algoritmo','objetivo','variables','semilla','porcentaje_prueba','n_entrenamiento','n_prueba','preprocesamiento_interno']:
+                details.append(('Modelo: '+key,str(ml.get(key,'No registrado'))))
+            if ml.get('validacion_cruzada'):details.append(('Validación cruzada',str(ml['validacion_cruzada'])))
+        pd.DataFrame(details,columns=['Campo','Valor']).to_excel(writer,sheet_name='Reproducibilidad',index=False)
+        pd.DataFrame([{'Apartado':'Pregunta orientadora','Observación':meta.get('pregunta','')},
+          {'Apartado':'Alcance del experimento','Observación':research_note(meta,ml)},
+          {'Apartado':'Hallazgos descriptivos','Observación':describe_data(df,meta.get('pregunta',''),ml.get('objetivo') if ml else None)},
+          {'Apartado':'Interpretación del modelo','Observación':explain_ml(ml) if ml else 'No se ejecutó modelo'},
+          {'Apartado':'Precauciones','Observación':'No inferir causalidad ni equivalencia de intervalos ordinales; validar contexto y temporalidad.'},
+          {'Apartado':'Propuesta pedagógica','Observación':'Contrastar hipótesis con docentes y estudiantes; planear una indagación contextualizada antes de cualquier intervención.'}]).to_excel(writer,sheet_name='Sintesis_pedagogica',index=False)
         for sheet in writer.book.worksheets:
             sheet.freeze_panes='A2';sheet.auto_filter.ref=sheet.dimensions
             from openpyxl.styles import Font,PatternFill

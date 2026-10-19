@@ -1,4 +1,4 @@
-"""LA-Lab v0.6.10 — Laboratorio abierto de Analítica del Aprendizaje."""
+"""LA-Lab v0.6.11 — Laboratorio abierto de Analítica del Aprendizaje."""
 import io
 import json
 import zipfile
@@ -195,14 +195,14 @@ h1,h2,h3 {letter-spacing:-.02em}
 
 with st.sidebar:
     st.title('🎓 LA-Lab')
-    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.10')
+    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.11')
     mode = st.radio('Modalidad', ['Casos guiados','Datos propios'],key='mode')
     idx = None
     if mode == 'Casos guiados':
         idx = st.selectbox('Caso de estudio',range(len(CASES)),format_func=lambda i:f'{i+1:02d}. {CASES[i][0]}')
     else:
         upload = st.file_uploader('Subir datos (máximo 10 MB)',type=['csv','tsv','txt','xlsx','xls','json','parquet'])
-    page = st.radio('Módulo',['Inicio','1. Datos','2. Limpieza','3. Indicadores','4. Visualización','5. Interpretación','6. Informe','7. Minería de datos'])
+    page = st.radio('Módulo',['Inicio','1. Datos','2. Limpieza','3. Indicadores','4. Visualización','5. Interpretación','6. Minería de datos','7. Informe'])
     st.warning('Utiliza datos sintéticos o autorizados y desidentificados. No cargues datos personales sensibles.')
 
 header_left, header_right = st.columns([2.7, 2.3], vertical_alignment="center", gap="medium")
@@ -431,8 +431,8 @@ elif page=='5. Interpretación':
     st.text_area('Redacta tu interpretación y recomendación',key='reflection',height=120)
     if st.session_state.get('reflection'):
         st.download_button('Descargar reflexión (.txt)',st.session_state.reflection,'reflexion_la_lab.txt','text/plain')
-elif page=='6. Informe':
-    st.header('6. Informe académico integral')
+elif page=='7. Informe':
+    st.header('7. Informe académico integral')
     st.write('Exporta resultados, figuras, interpretaciones, limitaciones, recomendaciones y referencias. Solo se incluyen análisis efectivamente ejecutados en esta sesión.')
     ml=st.session_state.get('ml_payload')
     plot=st.session_state.get('plot_payload')
@@ -457,26 +457,26 @@ elif page=='6. Informe':
               'licencia':source.get('license','') if mode=='Casos guiados' else 'Verificar autorización del archivo',
               'reflexion':st.session_state.get('reflection','')}
     st.download_button('Descargar datos actuales (.csv)',csv_bytes(df),'datos_la_lab.csv','text/csv')
-    txt='LA-Lab v0.6.10 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
-    st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v0610.txt','text/plain')
+    txt='LA-Lab v0.6.11 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
+    st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v0611.txt','text/plain')
     st.caption(f'Generador de informes cargado: {getattr(reporting, "REPORT_VERSION", "ANTIGUO")} · archivo: {Path(reporting.__file__).name}')
     try:
-        if getattr(reporting, 'REPORT_VERSION', None) != '0.6.10':
+        if getattr(reporting, 'REPORT_VERSION', None) != '0.6.11':
             st.error('VERSIONES INCOMPATIBLES: actualiza reporting.py junto con app.py en la raíz del repositorio y reinicia Streamlit. No se descargará un PDF antiguo.')
         else:
             pdf=build_pdf(df,metadata,ml,plot)
-            st.download_button('Descargar informe académico v0.6.10 (.pdf)',pdf,'informe_la_lab_v0610.pdf','application/pdf')
+            st.download_button('Descargar informe académico v0.6.11 (.pdf)',pdf,'informe_la_lab_v0611.pdf','application/pdf')
     except Exception as exc:
         st.error(f'No se pudo generar el PDF: {exc}')
     try:
         xlsx=build_excel(df,metadata,ml)
-        st.download_button('Descargar libro de análisis (.xlsx)',xlsx,'analisis_la_lab_v0610.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        st.download_button('Descargar libro de análisis (.xlsx)',xlsx,'analisis_la_lab_v0611.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     except Exception as exc:
         st.error(f'No se pudo generar el Excel: {exc}')
     text_box('El informe incorpora análisis registrados, visualizaciones reproducibles, interpretación y sugerencias condicionadas. Las recomendaciones requieren revisión humana y no constituyen diagnóstico individual.')
 
-elif page=='7. Minería de datos':
-    st.header('7. Minería de datos y aprendizaje automático')
+elif page=='6. Minería de datos':
+    st.header('6. Minería de datos y aprendizaje automático')
     st.caption('Experimentos exploratorios. No usar para decisiones automatizadas sobre estudiantes.')
     from sklearn.model_selection import train_test_split, cross_validate, KFold, StratifiedKFold
     from sklearn.compose import ColumnTransformer
@@ -695,4 +695,4 @@ elif page=='7. Minería de datos':
             st.error(f'No fue posible ejecutar el modelo: {ex}')
 
 st.divider()
-st.caption('LA-Lab v0.6.10 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
+st.caption('LA-Lab v0.6.11 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
