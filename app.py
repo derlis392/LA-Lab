@@ -1,4 +1,4 @@
-"""LA-Lab v0.6.7 — Laboratorio abierto de Analítica del Aprendizaje."""
+"""LA-Lab v0.6.8 — Laboratorio abierto de Analítica del Aprendizaje."""
 import io
 import json
 import zipfile
@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+import base64
 
 st.set_page_config(page_title='LA-Lab | Analítica del Aprendizaje', page_icon='🎓', layout='wide')
 ROOT = Path(__file__).parent
@@ -194,7 +195,7 @@ h1,h2,h3 {letter-spacing:-.02em}
 
 with st.sidebar:
     st.title('🎓 LA-Lab')
-    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.7')
+    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.8')
     mode = st.radio('Modalidad', ['Casos guiados','Datos propios'],key='mode')
     idx = None
     if mode == 'Casos guiados':
@@ -209,20 +210,29 @@ with header_left:
     st.title('🎓 LA-Lab')
     st.caption('Tecnologías Inteligentes para la Transformación Digital de los Ecosistemas Educativos')
     st.caption('Dr. Derlis Hernández Lara · CUAED · Universidad Nacional Autónoma de México')
-    research_logo = ROOT/'assets'/'linea_investigacion.svg'
-    if research_logo.exists():
-        with st.expander('Ver figura de la línea de investigación'):
-            st.image(str(research_logo), caption='Tecnologías Inteligentes para la Transformación Digital de los Ecosistemas Educativos', width=420)
 with header_right:
     st.markdown("<div style='height:58px'></div>", unsafe_allow_html=True)
     logos = ROOT/'assets'
     unam, cuaed = logos/'unam.png', logos/'cuaed.png'
+    research_logo = logos/'linea_investigacion.svg'
     if unam.exists() and cuaed.exists():
-        # Mostrar imágenes originales a escala reducida sin reescalar archivos fuente.
-        # Para zoom sin pixelación se requieren SVG institucionales oficiales.
-        col_unam, col_cuaed = st.columns([1, 2.2], vertical_alignment="center")
-        with col_unam: st.image(str(unam), width=78)
-        with col_cuaed: st.image(str(cuaed), width=156)
+        col_unam, col_cuaed, col_linea = st.columns([1, 2.1, 1.5], vertical_alignment="center")
+        with col_unam:
+            st.image(str(unam), use_container_width=True)
+        with col_cuaed:
+            st.image(str(cuaed), use_container_width=True)
+        with col_linea:
+            if research_logo.exists():
+                svg_base64 = base64.b64encode(research_logo.read_bytes()).decode('ascii')
+                st.markdown(
+                    f'<img src="data:image/svg+xml;base64,{svg_base64}" '
+                    'alt="Logotipo de la línea de investigación TITDEE" '
+                    'title="Tecnologías Inteligentes para la Transformación Digital de los Ecosistemas Educativos" '
+                    'style="display:block;width:100%;height:116px;object-fit:contain;" />',
+                    unsafe_allow_html=True
+                )
+            else:
+                st.caption('Logo de investigación no disponible')
     else:
         st.caption('Identidad institucional: emblemas pendientes')
 
@@ -444,7 +454,7 @@ elif page=='6. Informe':
               'licencia':source.get('license','') if mode=='Casos guiados' else 'Verificar autorización del archivo',
               'reflexion':st.session_state.get('reflection','')}
     st.download_button('Descargar datos actuales (.csv)',csv_bytes(df),'datos_la_lab.csv','text/csv')
-    txt='LA-Lab v0.6.7 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
+    txt='LA-Lab v0.6.8 | '+title+'\n'+overview+'\n\n'+(explain_ml(ml) if ml else 'Sin experimento de ML')+'\n'+str(metadata)
     st.download_button('Descargar síntesis (.txt)',txt.encode('utf-8'),'informe_la_lab_v061.txt','text/plain')
     st.caption(f'Generador de informes cargado: {getattr(reporting, "REPORT_VERSION", "ANTIGUO")} · archivo: {Path(reporting.__file__).name}')
     try:
@@ -452,7 +462,7 @@ elif page=='6. Informe':
             st.error('VERSIONES INCOMPATIBLES: actualiza reporting.py junto con app.py en la raíz del repositorio y reinicia Streamlit. No se descargará un PDF antiguo.')
         else:
             pdf=build_pdf(df,metadata,ml,plot)
-            st.download_button('Descargar informe académico v0.6.7 (.pdf)',pdf,'informe_la_lab_v067.pdf','application/pdf')
+            st.download_button('Descargar informe académico v0.6.8 (.pdf)',pdf,'informe_la_lab_v068.pdf','application/pdf')
     except Exception as exc:
         st.error(f'No se pudo generar el PDF: {exc}')
     try:
