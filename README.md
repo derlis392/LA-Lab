@@ -1,4 +1,4 @@
-# LA-Lab v0.6.9 — Laboratorio Virtual de Analítica del Aprendizaje
+# LA-Lab v0.6.10 — Laboratorio Virtual de Analítica del Aprendizaje
 
 Aplicación educativa abierta con siete módulos y **14 prácticas guiadas basadas en dos colecciones reales de UCI**. Las prácticas son preguntas diferentes sobre los mismos conjuntos de datos, no 14 datasets independientes.
 
@@ -9,7 +9,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Cambios de v0.6.9
+## Cambios de v0.6.10
 
 - Se sustituyó el enlace de CiteSeerX por el registro institucional de Universidade do Minho para Student Performance (Matemáticas y Portugués). Se conservan los demás enlaces y funciones de v0.6.5.
 
@@ -25,7 +25,7 @@ streamlit run app.py
 - **Caso 14: Factores de permanencia universitaria**: Predict Students’ Dropout and Academic Success, UCI 697. Se analizan matrícula, becas y trayectoria, sin inferencia causal.
 - Los tres casos tienen **fuentes originales diferentes** y se cargan automáticamente, con descarga del CSV de la práctica y enlace a fuente/artículo.
 - El límite global de carga sigue siendo **10 MB**. No se necesita subir ZIP para casos guiados.
-- `app.py`, `reporting.py`, `requirements.txt`, `README.md` y `.streamlit/config.toml` están sincronizados con v0.6.9.
+- `app.py`, `reporting.py`, `requirements.txt`, `README.md` y `.streamlit/config.toml` están sincronizados con v0.6.10.
 - PDF y XLSX se mantienen en el módulo 6. Los logotipos proporcionados se conservan en `assets/`.
 
 ## Fuentes académicas y acceso directo
@@ -42,7 +42,7 @@ Las prácticas 12–14 **no miden clics en entornos virtuales**: se redefinieron
 
 ## Despliegue
 
-Subir **todos los archivos de este ZIP** a la raíz de `main` en GitHub, conservando `.streamlit/config.toml` y `assets/`. Si Streamlit Cloud mantiene una sesión antigua, usar `Manage app → Reboot app`. Confirmar `v0.6.9` en la barra lateral y en un PDF recién generado.
+Subir **todos los archivos de este ZIP** a la raíz de `main` en GitHub, conservando `.streamlit/config.toml` y `assets/`. Si Streamlit Cloud mantiene una sesión antigua, usar `Manage app → Reboot app`. Confirmar `v0.6.10` en la barra lateral y en un PDF recién generado.
 
 ## Comprobaciones sugeridas
 
@@ -62,8 +62,14 @@ El archivo `data/mathe_original.csv` procede del ZIP original de MathE aportado 
 
 Se incorpora `assets/linea_investigacion.svg` (archivo vectorial original proporcionado por el usuario). En la cabecera de LA-Lab, el panel **Ver figura de la línea de investigación** permite visualizarla sin rasterizar el archivo. Los emblemas institucionales UNAM y CUAED se mantienen sin cambios.
 
-## Corrección de visibilidad v0.6.9
+## Corrección de visibilidad v0.6.10
 El logotipo TITDEE se muestra directamente en la cabecera, junto a UNAM y CUAED, sin desplegables. Se incrusta el SVG original como imagen vectorial en HTML, evitando las limitaciones de visualización de SVG de `st.image`. Verificar que `assets/linea_investigacion.svg` se suba a GitHub.
 
-## v0.6.9 — alineación de identidad visual
+## v0.6.10 — alineación de identidad visual
 Se sustituyeron las tres columnas de logotipos por una fila flex centrada con espacios uniformes, tamaños controlados y SVG original de la línea de investigación. Se conservaron los módulos y las referencias de v0.6.8.
+
+## Corrección de informes v0.6.10
+- Corregida la comparación entre `reporting.REPORT_VERSION` y la versión requerida por `app.py`, que bloqueaba todos los PDF.
+- Nombres de archivo PDF, TXT y XLSX sincronizados.
+- Pie de página actualizado.
+- Validar generación de PDF en Streamlit tras desplegar.
