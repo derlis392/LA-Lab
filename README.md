@@ -88,3 +88,11 @@ Se sustituyeron las tres columnas de logotipos por una fila flex centrada con es
 
 ## Corrección v0.6.13: PDF sin Cairo
 El informe usa `assets/linea_investigacion_pdf.png`, rasterizado a alta resolución y recortado previamente desde el SVG original. El SVG se conserva para la interfaz web. No requiere CairoSVG ni bibliotecas del sistema Cairo en Streamlit Cloud.
+
+## Nuevo módulo Motivación (v0.6.14)
+
+En la barra lateral selecciona **Motivación**. Incluye un Excel **sintético** de 60 respuestas (`data/respuestas_sinteticas_60.xlsx`) generado con semilla fija y una coincidencia de cumpleaños forzada para probar el detector. No contiene respuestas reales. También acepta el XLSX o CSV descargado del formulario de Google Forms con las preguntas numeradas 1–10.
+
+Funciones: validación de día/mes, conteo de coincidencias, probabilidad teórica de cumpleaños (365 o 366 fechas), simulación reproducible de grupos, frecuencias absolutas/relativas/acumuladas, medidas descriptivas, histogramas, probabilidades empíricas y condicionales, y dispersión estudio–promedio. El módulo no incorpora datos de la encuesta a los modelos de los otros módulos ni sustituye el informe PDF académico de los casos guiados.
+
+Para desplegar, sustituye el contenido completo del repositorio por este ZIP, conservando `motivacion.py` y `data/respuestas_sinteticas_60.xlsx`. La dependencia `streamlit` ya figura en `requirements.txt`. No se requiere CairoSVG.

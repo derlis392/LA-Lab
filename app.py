@@ -1,10 +1,11 @@
-"""LA-Lab v0.6.13 — Laboratorio abierto de Analítica del Aprendizaje."""
+"""LA-Lab v0.6.14 — Laboratorio abierto de Analítica del Aprendizaje."""
 import io
 import json
 import zipfile
 import urllib.request
 from pathlib import Path
 import reporting
+import motivacion
 from reporting import build_pdf, build_excel, explain_ml, describe_data, summarize_plot
 import numpy as np
 import pandas as pd
@@ -195,14 +196,14 @@ h1,h2,h3 {letter-spacing:-.02em}
 
 with st.sidebar:
     st.title('🎓 LA-Lab')
-    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.13')
+    st.caption('Laboratorio Virtual de Analítica del Aprendizaje · v0.6.14')
     mode = st.radio('Modalidad', ['Casos guiados','Datos propios'],key='mode')
     idx = None
     if mode == 'Casos guiados':
         idx = st.selectbox('Caso de estudio',range(len(CASES)),format_func=lambda i:f'{i+1:02d}. {CASES[i][0]}')
     else:
         upload = st.file_uploader('Subir datos (máximo 10 MB)',type=['csv','tsv','txt','xlsx','xls','json','parquet'])
-    page = st.radio('Módulo',['Inicio','1. Datos','2. Limpieza','3. Indicadores','4. Visualización','5. Interpretación','6. Minería de datos','7. Informe'])
+    page = st.radio('Módulo',['Inicio','Motivación','1. Datos','2. Limpieza','3. Indicadores','4. Visualización','5. Interpretación','6. Minería de datos','7. Informe'])
     st.warning('Utiliza datos sintéticos o autorizados y desidentificados. No cargues datos personales sensibles.')
 
 header_left, header_right = st.columns([2.7, 2.3], vertical_alignment="center", gap="medium")
@@ -238,6 +239,10 @@ with header_right:
         )
     else:
         st.caption('Identidad institucional: faltan archivos de logotipos en assets/')
+
+if page == 'Motivación':
+    motivacion.render()
+    st.stop()
 
 if mode=='Casos guiados':
     title, source_id, question, suggested_target = CASES[idx]
@@ -695,4 +700,4 @@ elif page=='6. Minería de datos':
             st.error(f'No fue posible ejecutar el modelo: {ex}')
 
 st.divider()
-st.caption('LA-Lab v0.6.13 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
+st.caption('LA-Lab v0.6.14 · Prototipo abierto para enseñanza e investigación · No utilizar para decisiones automatizadas sobre estudiantes. Identidad institucional: incorporación de emblemas sujeta a archivos oficiales y autorización de uso.')
