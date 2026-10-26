@@ -12,8 +12,9 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, KeepTogether
 from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
+from reportlab.lib.enums import TA_CENTER
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 import streamlit as st
@@ -108,7 +109,35 @@ def frequency_figure(edges, mids, counts, label):
     fig.update_yaxes(rangemode='tozero',dtick=1 if max(counts)<=20 else None)
     return fig
 
-def make_motivation_pdf(df, valid, matches, probability, empirical_rate, table, edges, mids, counts, selected, sim_runs, seed):
+def birthday_explanation(n, days):
+    return (f"La paradoja del cumpleaños establece que, en un grupo de {n} personas, "
+            "la probabilidad de que al menos dos compartan el mismo día y mes de nacimiento "
+            "puede ser sorprendentemente elevada. Para calcularla se utiliza el evento complementario: "
+            "que todos tengan fechas distintas. Bajo el supuesto de cumpleaños independientes "
+            f"y {days} fechas equiprobables, se multiplican las probabilidades de no coincidencia "
+            "para cada nueva persona y se resta el resultado de uno. Esta probabilidad corresponde "
+            "al modelo teórico, no a la proporción de personas con cumpleaños repetidos ni "
+            "a la frecuencia observada en un solo grupo.")
+
+
+def birthday_illustration(n, days):
+    """Figura original generada con Matplotlib, sin imágenes externas."""
+    sizes = list(range(2, min(days, max(60, n)) + 1))
+    probs = [birthday_probability(k, days) * 100 for k in sizes]
+    fig, ax = plt.subplots(figsize=(7.5, 2.65))
+    ax.plot(sizes, probs, color='#155A9A', linewidth=2.5)
+    ax.axhline(50, color='#888888', linestyle='--', linewidth=1, label='Umbral del 50 %')
+    if n >= 2 and n <= days:
+        ax.scatter([n], [birthday_probability(n, days)*100], color='#E4572E', s=75, zorder=5)
+        ax.annotate(f'n={n}: {birthday_probability(n, days):.2%}', (n, birthday_probability(n, days)*100),
+                    xytext=(-90,-28),textcoords='offset points',fontsize=9)
+    ax.set(xlabel='Número de personas', ylabel='Probabilidad (%)', title='Cómo crece la probabilidad de coincidencia')
+    ax.set_ylim(0, 105);ax.set_xlim(2,max(sizes));ax.grid(alpha=.18)
+    fig.tight_layout()
+    return fig
+
+
+def make_motivation_pdf(df, valid, matches, probability, empirical_rate, table, edges, mids, counts, selected, sim_runs, seed, days=365, synthetic=False):
     """Informe autónomo sin Kaleido ni bibliotecas del sistema."""
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf,pagesize=(21*cm,29.7*cm),leftMargin=1.8*cm,rightMargin=1.8*cm,
@@ -129,21 +158,26 @@ def make_motivation_pdf(df, valid, matches, probability, empirical_rate, table, 
     if logos:
         row=Table([logos],colWidths=[5.6*cm]*len(logos),hAlign='CENTER')
         story.append(row);story.append(Spacer(1,0.5*cm))
-    para('LA-Lab v0.6.15 | Motivación', 'Title')
+    para('LA-Lab v0.6.16 | Motivación', 'Title')
     para('Encuesta, paradoja del cumpleaños y estadística descriptiva', 'Heading2')
-    para('Reporte exploratorio. Las respuestas sintéticas se utilizan únicamente con fines de demostración. No permite inferir causalidad ni fundamentar decisiones individuales.')
+    para(('Reporte exploratorio con datos sintéticos: demostración, no estudiantes reales.' if synthetic else 'Reporte exploratorio con respuestas cargadas por el usuario.') + ' No permite inferir causalidad ni fundamentar decisiones individuales.')
     para('1. Paradoja del cumpleaños','Heading2')
     para(f'Respuestas: {len(df)}. Cumpleaños válidos analizados: {len(valid)}. Fechas compartidas: {len(matches)}. Personas involucradas: {int(matches.sum())}.')
     para(f'Probabilidad teórica: {probability:.2%}. Simulación: {empirical_rate:.2%} en {sim_runs} grupos (semilla {seed}).')
-    para('Modelo: fechas equiprobables e independientes. La frecuencia de una sola clase no es una estimación fiable de esta probabilidad.')
+    para(birthday_explanation(len(valid),days))
+    para('Fórmula: P(al menos una coincidencia) = 1 - [D! / ((D-n)! × D^n)], para n ≤ D, donde n es el número de personas y D el número de fechas posibles.')
+    fig_birth=birthday_illustration(len(valid),days)
+    birth_png=io.BytesIO();fig_birth.savefig(birth_png,format='png',dpi=145);plt.close(fig_birth);birth_png.seek(0)
+    story.append(Image(birth_png,width=15.8*cm,height=5.6*cm));story.append(Spacer(1,.3*cm))
+    para('La observación de una coincidencia en un solo grupo no demuestra la probabilidad teórica. La simulación repite el experimento con grupos independientes.')
     if len(matches):
         t=Table([['Cumpleaños','Respuestas']]+[[str(k),str(v)] for k,v in matches.items()],colWidths=[8*cm,6*cm],repeatRows=1)
         t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#EAF1F9')),('GRID',(0,0),(-1,-1),.35,colors.lightgrey),('BOTTOMPADDING',(0,0),(-1,-1),6)]))
         story.append(t);story.append(Spacer(1,.4*cm))
     para('2. Distribución de frecuencias','Heading2')
     para(f'Variable: {LABELS[selected]}. Intervalos: {len(counts)}. Registros válidos: {int(counts.sum())}.')
-    data=[['Intervalo','f','fr','%','F acum.']]+[[str(r['Intervalo']),str(r['f']),f"{r['fr']:.4f}",f"{r['%']:.2f}",str(r['F acumulada'])] for _,r in table.iterrows()]
-    t=Table(data,colWidths=[5.4*cm,2*cm,2.3*cm,2.3*cm,2.6*cm],repeatRows=1)
+    data=[['Intervalo','f','fr','%','F acum.','Fr acum.']]+[[str(r['Intervalo']),str(r['f']),f"{r['fr']:.4f}",f"{r['%']:.2f}",str(r['F acumulada']),f"{r['Fr acumulada']:.4f}"] for _,r in table.iterrows()]
+    t=Table(data,colWidths=[4.7*cm,1.3*cm,2.1*cm,1.9*cm,2.3*cm,2.5*cm],repeatRows=1)
     t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#EAF1F9')),('GRID',(0,0),(-1,-1),.35,colors.lightgrey),('FONTSIZE',(0,0),(-1,-1),8),('BOTTOMPADDING',(0,0),(-1,-1),5)]))
     story.append(t);story.append(Spacer(1,.35*cm))
     fig,ax=plt.subplots(figsize=(8,3.5))
@@ -152,17 +186,35 @@ def make_motivation_pdf(df, valid, matches, probability, empirical_rate, table, 
     ax.set(xlabel=LABELS[selected],ylabel='Frecuencia');ax.legend();fig.tight_layout()
     png=io.BytesIO();fig.savefig(png,format='png',dpi=145);plt.close(fig);png.seek(0)
     story.append(Image(png,width=16.8*cm,height=7.35*cm));story.append(Spacer(1,.25*cm))
-    para('f: frecuencia absoluta; fr: frecuencia relativa; %: porcentaje; F acumulada: observaciones hasta el límite superior del intervalo.')
+    para('f: frecuencia absoluta; fr: frecuencia relativa; %: porcentaje; F acumulada: número acumulado de observaciones; Fr acumulada: proporción acumulada.')
     vals=df[selected].dropna()
     para(f'Media: {vals.mean():.2f}; mediana: {vals.median():.2f}; desviación estándar muestral: {vals.std(ddof=1):.2f}.' if len(vals)>1 else f'Media: {vals.mean():.2f}.')
-    para('3. Probabilidad empírica y analítica educativa','Heading2')
+    para('3. Estimaciones iniciales de probabilidad','Heading2')
+    guesses = df['estimacion'].dropna().astype(str).str.strip()
+    if len(guesses):
+        guess_counts = guesses.value_counts()
+        fig_g,ax_g=plt.subplots(figsize=(8,2.9))
+        ax_g.bar(range(len(guess_counts)),guess_counts.values,color='#587DC1')
+        ax_g.set_xticks(range(len(guess_counts)),guess_counts.index,rotation=20,ha='right',fontsize=8)
+        ax_g.set_ylabel('Respuestas');ax_g.set_title('Estimación previa de los participantes')
+        fig_g.tight_layout();gpng=io.BytesIO();fig_g.savefig(gpng,format='png',dpi=145);plt.close(fig_g);gpng.seek(0)
+        story.append(Image(gpng,width=15.8*cm,height=5.7*cm));story.append(Spacer(1,.2*cm))
+        para(f'Comparación: la probabilidad teórica para {len(valid)} personas es {probability:.2%}. Las estimaciones son intervalos, no valores puntuales.')
+    else:
+        para('No se registraron estimaciones iniciales de probabilidad.')
+    para('4. Probabilidad empírica y analítica educativa','Heading2')
     grades=df['promedio'].dropna()
     if len(grades):
         para(f'Proporción con promedio igual o superior a 8: {(grades>=8).sum()}/{len(grades)} = {(grades>=8).mean():.2%}.')
     pair=df[['estudio','promedio']].dropna()
     if len(pair)>=3 and pair['estudio'].nunique()>1 and pair['promedio'].nunique()>1:
         para(f'Correlación exploratoria entre horas de estudio y promedio: r = {pair.corr().iloc[0,1]:.3f}, n = {len(pair)}. No demuestra causalidad.')
-    para('4. Reflexión pedagógica','Heading2')
+    para('5. Conclusión automática y reflexión pedagógica','Heading2')
+    para(f'En el conjunto analizado se identificaron {len(matches)} fechas compartidas entre {len(valid)} cumpleaños válidos. '
+         f'La probabilidad teórica de al menos una coincidencia es {probability:.2%}; '
+         f'la frecuencia simulada con {sim_runs} grupos fue {empirical_rate:.2%}. '
+         'La comparación ilustra el papel de la repetición experimental. Los hábitos y promedios '
+         'autodeclarados describen únicamente a quienes respondieron y no permiten conclusiones causales.')
     para('¿Por qué un evento observado no demuestra una probabilidad? ¿Qué cambia al repetir el experimento? ¿Qué limitaciones tienen los datos autodeclarados? ¿Qué decisiones educativas no deben tomarse con esta encuesta?')
     doc.build(story)
     return buf.getvalue()
@@ -217,7 +269,13 @@ def render():
     b.metric('Cumpleaños válidos analizados',n)
     c.metric('Probabilidad teórica',f'{probability:.2%}')
     d.metric('Coincidencia observada','Sí' if groups else 'No')
+    days=366 if include_leap else 365
     st.caption('Modelo de referencia: cumpleaños independientes y fechas equiprobables. En la opción de 365 días se excluyen del análisis observado los nacimientos del 29 de febrero.')
+    st.markdown('**¿En qué consiste la paradoja del cumpleaños?**')
+    st.write(birthday_explanation(n,days))
+    st.latex(r'P(\text{al menos una coincidencia})=1-\prod_{k=0}^{n-1}\frac{D-k}{D}')
+    st.caption(f'En este conjunto, n = {n} y D = {days}. Para n > D, la coincidencia es segura.')
+    st.pyplot(birthday_illustration(n,days),clear_figure=True)
     st.write(f'**Resultado:** {groups} fecha(s) compartida(s), con {participants} participante(s) involucrado(s) en coincidencias. Probabilidad teórica para {n} cumpleaños analizados: **{probability:.2%}**.')
     with st.expander('¿Cómo se calcula la probabilidad teórica?'):
         st.latex(r'P(\text{al menos una coincidencia})=1-\prod_{k=0}^{n-1}\frac{D-k}{D}')
@@ -266,8 +324,8 @@ def render():
         st.dataframe(stats,hide_index=True,use_container_width=True)
     if not values.empty and n>=2:
         try:
-            pdf=make_motivation_pdf(df,valid,matches,probability,empirical_rate,table,edges,mids,counts,selected,runs,int(seed))
-            st.download_button('Descargar informe de Motivación (PDF)',pdf,'LA-Lab_Motivacion_v0615.pdf','application/pdf',key='mot_pdf')
+            pdf=make_motivation_pdf(df,valid,matches,probability,empirical_rate,table,edges,mids,counts,selected,runs,int(seed),days,source.startswith('Ejemplo'))
+            st.download_button('Descargar informe de Motivación (PDF)',pdf,'LA-Lab_Motivacion_v0616.pdf','application/pdf',key='mot_pdf')
         except Exception as exc:
             st.warning(f'No se pudo generar el informe PDF: {exc}')
     st.subheader('4. Probabilidad empírica y condicional')
@@ -287,7 +345,13 @@ def render():
         st.caption(f'Correlación de Pearson (exploratoria): r = {pair.corr().iloc[0,1]:.3f}; n = {len(pair)}. No permite establecer causalidad.')
     else:
         st.info('Se requieren al menos tres pares válidos de horas de estudio y promedio.')
-    st.subheader('6. Reflexión pedagógica')
+    st.subheader('6. Conclusión y reflexión pedagógica')
+    st.write(f'**Síntesis automática:** de {n} cumpleaños válidos, se identificaron {groups} fechas compartidas '
+             f'que involucran a {participants} personas. La probabilidad teórica de que exista al menos '
+             f'una coincidencia es {probability:.2%}; en {runs} grupos simulados se observó '
+             f'una frecuencia de {empirical_rate:.2%}. Estos resultados ilustran el contraste entre '
+             'modelo probabilístico, simulación y observación única. Las asociaciones educativas '
+             'exploradas no implican causalidad.')
     st.markdown('**Preguntas para discutir:** ¿por qué una coincidencia observada no demuestra una probabilidad? ¿Qué cambia al repetir el experimento? ¿Qué sesgos tienen los promedios autodeclarados? ¿Qué decisiones educativas NO sería válido tomar con esta encuesta?')
     st.caption('Privacidad: no se muestran filas individuales ni se almacenan archivos en una base de datos del módulo. Evita compartir públicamente resultados de subgrupos muy pequeños.')
     output=df.drop(columns=['mes_num','cumple_valido','fecha_cumple']).to_csv(index=False).encode('utf-8-sig')
