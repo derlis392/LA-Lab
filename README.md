@@ -1,3 +1,7 @@
+# LA-Lab v0.6.15 — Actualización del módulo Motivación
+
+Incluye histograma y polígono de frecuencias interactivos superpuestos con Plotly; intervalos decimales legibles, frecuencias acumuladas y explicación; cálculo teórico paso a paso; comparación visual de estimaciones del grupo; informe PDF de Motivación con tabla, gráfico, estadísticas, simulación y preguntas de reflexión. Conserva los demás módulos de v0.6.14 y el generador de informes general de v0.6.13 sin alterar.
+
 # LA-Lab v0.6.13 — Laboratorio Virtual de Analítica del Aprendizaje
 
 Aplicación educativa abierta con siete módulos y **14 prácticas guiadas basadas en dos colecciones reales de UCI**. Las prácticas son preguntas diferentes sobre los mismos conjuntos de datos, no 14 datasets independientes.

@@ -8,6 +8,14 @@ import unicodedata
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, KeepTogether
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import cm
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 import streamlit as st
 
 MONTHS = {'enero':1,'febrero':2,'marzo':3,'abril':4,'mayo':5,'junio':6,'julio':7,'agosto':8,'septiembre':9,'octubre':10,'noviembre':11,'diciembre':12}
@@ -63,6 +71,102 @@ def empirical(df,condition,subset=None):
     denom = int(valid.sum())
     return (int(condition.loc[data.index][valid].sum()),denom) if denom else (0,0)
 
+def frequency_table(values, bins):
+    """Intervalos cerrados a la izquierda y abiertos a la derecha, salvo el último."""
+    vals = values.to_numpy(dtype=float)
+    lo, hi = float(vals.min()), float(vals.max())
+    if lo == hi:
+        lo -= 0.5
+        hi += 0.5
+    edges = np.linspace(lo, hi, bins + 1)
+    counts, _ = np.histogram(vals, bins=edges)
+    mids = (edges[:-1] + edges[1:]) / 2
+    # No se utilizan los intervalos textuales de pandas, que introducen
+    # artefactos binarios como 6.089999999999999.
+    intervals = [f"[{a:.2f}, {b:.2f}{']' if i == len(counts)-1 else ')'}" for i,(a,b) in enumerate(zip(edges[:-1],edges[1:]))]
+    table = pd.DataFrame({'Intervalo':intervals,'f':counts})
+    table['fr'] = np.round(counts / len(vals), 4)
+    table['%'] = np.round(counts / len(vals) * 100, 2)
+    table['F acumulada'] = np.cumsum(counts)
+    table['Fr acumulada'] = np.round(np.cumsum(counts) / len(vals),4)
+    return edges, mids, counts, table
+
+def frequency_figure(edges, mids, counts, label):
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=mids, y=counts, width=np.diff(edges),
+                         name='Histograma', marker_color='#2A72BA', opacity=0.67,
+                         customdata=np.column_stack([edges[:-1],edges[1:]]),
+                         hovertemplate='Intervalo: %{customdata[0]:.2f} a %{customdata[1]:.2f}<br>Frecuencia: %{y}<extra></extra>'))
+    fig.add_trace(go.Scatter(x=mids,y=counts,mode='lines+markers',name='Polígono de frecuencias',
+                             line=dict(color='#E4572E',width=3),marker=dict(size=9),
+                             hovertemplate='Marca de clase: %{x:.2f}<br>Frecuencia: %{y}<extra></extra>'))
+    fig.update_layout(title=f'Histograma y polígono de frecuencias: {label}',
+                      xaxis_title=label,yaxis_title='Frecuencia',barmode='overlay',
+                      hovermode='x unified',legend=dict(orientation='h',y=1.12),
+                      margin=dict(t=95,b=55),dragmode='zoom')
+    fig.update_xaxes(range=[edges[0]-(edges[-1]-edges[0])*.03,edges[-1]+(edges[-1]-edges[0])*.03])
+    fig.update_yaxes(rangemode='tozero',dtick=1 if max(counts)<=20 else None)
+    return fig
+
+def make_motivation_pdf(df, valid, matches, probability, empirical_rate, table, edges, mids, counts, selected, sim_runs, seed):
+    """Informe autónomo sin Kaleido ni bibliotecas del sistema."""
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf,pagesize=(21*cm,29.7*cm),leftMargin=1.8*cm,rightMargin=1.8*cm,
+                            topMargin=1.8*cm,bottomMargin=1.8*cm)
+    sty=getSampleStyleSheet()
+    story=[]
+    def para(t,style='Normal'):
+        story.append(Paragraph(str(t),sty[style]));story.append(Spacer(1,0.22*cm))
+    logos=[]
+    root=__import__('pathlib').Path(__file__).parent
+    for fn in ['unam.png','cuaed.png','linea_investigacion_pdf.png']:
+        path=root/'assets'/fn
+        if path.exists():
+            from PIL import Image as PILImage
+            with PILImage.open(path) as im: w,h=im.size
+            target_w=3.0*cm
+            logos.append(Image(str(path),width=target_w,height=target_w*h/w))
+    if logos:
+        row=Table([logos],colWidths=[5.6*cm]*len(logos),hAlign='CENTER')
+        story.append(row);story.append(Spacer(1,0.5*cm))
+    para('LA-Lab v0.6.15 | Motivación', 'Title')
+    para('Encuesta, paradoja del cumpleaños y estadística descriptiva', 'Heading2')
+    para('Reporte exploratorio. Las respuestas sintéticas se utilizan únicamente con fines de demostración. No permite inferir causalidad ni fundamentar decisiones individuales.')
+    para('1. Paradoja del cumpleaños','Heading2')
+    para(f'Respuestas: {len(df)}. Cumpleaños válidos analizados: {len(valid)}. Fechas compartidas: {len(matches)}. Personas involucradas: {int(matches.sum())}.')
+    para(f'Probabilidad teórica: {probability:.2%}. Simulación: {empirical_rate:.2%} en {sim_runs} grupos (semilla {seed}).')
+    para('Modelo: fechas equiprobables e independientes. La frecuencia de una sola clase no es una estimación fiable de esta probabilidad.')
+    if len(matches):
+        t=Table([['Cumpleaños','Respuestas']]+[[str(k),str(v)] for k,v in matches.items()],colWidths=[8*cm,6*cm],repeatRows=1)
+        t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#EAF1F9')),('GRID',(0,0),(-1,-1),.35,colors.lightgrey),('BOTTOMPADDING',(0,0),(-1,-1),6)]))
+        story.append(t);story.append(Spacer(1,.4*cm))
+    para('2. Distribución de frecuencias','Heading2')
+    para(f'Variable: {LABELS[selected]}. Intervalos: {len(counts)}. Registros válidos: {int(counts.sum())}.')
+    data=[['Intervalo','f','fr','%','F acum.']]+[[str(r['Intervalo']),str(r['f']),f"{r['fr']:.4f}",f"{r['%']:.2f}",str(r['F acumulada'])] for _,r in table.iterrows()]
+    t=Table(data,colWidths=[5.4*cm,2*cm,2.3*cm,2.3*cm,2.6*cm],repeatRows=1)
+    t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#EAF1F9')),('GRID',(0,0),(-1,-1),.35,colors.lightgrey),('FONTSIZE',(0,0),(-1,-1),8),('BOTTOMPADDING',(0,0),(-1,-1),5)]))
+    story.append(t);story.append(Spacer(1,.35*cm))
+    fig,ax=plt.subplots(figsize=(8,3.5))
+    ax.bar(mids,counts,width=np.diff(edges),align='center',alpha=.65,edgecolor='white',label='Histograma')
+    ax.plot(mids,counts,'o-',color='#E4572E',linewidth=2,label='Polígono de frecuencias')
+    ax.set(xlabel=LABELS[selected],ylabel='Frecuencia');ax.legend();fig.tight_layout()
+    png=io.BytesIO();fig.savefig(png,format='png',dpi=145);plt.close(fig);png.seek(0)
+    story.append(Image(png,width=16.8*cm,height=7.35*cm));story.append(Spacer(1,.25*cm))
+    para('f: frecuencia absoluta; fr: frecuencia relativa; %: porcentaje; F acumulada: observaciones hasta el límite superior del intervalo.')
+    vals=df[selected].dropna()
+    para(f'Media: {vals.mean():.2f}; mediana: {vals.median():.2f}; desviación estándar muestral: {vals.std(ddof=1):.2f}.' if len(vals)>1 else f'Media: {vals.mean():.2f}.')
+    para('3. Probabilidad empírica y analítica educativa','Heading2')
+    grades=df['promedio'].dropna()
+    if len(grades):
+        para(f'Proporción con promedio igual o superior a 8: {(grades>=8).sum()}/{len(grades)} = {(grades>=8).mean():.2%}.')
+    pair=df[['estudio','promedio']].dropna()
+    if len(pair)>=3 and pair['estudio'].nunique()>1 and pair['promedio'].nunique()>1:
+        para(f'Correlación exploratoria entre horas de estudio y promedio: r = {pair.corr().iloc[0,1]:.3f}, n = {len(pair)}. No demuestra causalidad.')
+    para('4. Reflexión pedagógica','Heading2')
+    para('¿Por qué un evento observado no demuestra una probabilidad? ¿Qué cambia al repetir el experimento? ¿Qué limitaciones tienen los datos autodeclarados? ¿Qué decisiones educativas no deben tomarse con esta encuesta?')
+    doc.build(story)
+    return buf.getvalue()
+
 def render():
     st.header('🎲 Motivación | De la encuesta a la analítica del aprendizaje')
     st.write('Actividad introductoria: recopilar datos, verificar su calidad, explorar distribuciones y contrastar una predicción probabilística con un evento observado.')
@@ -115,6 +219,10 @@ def render():
     d.metric('Coincidencia observada','Sí' if groups else 'No')
     st.caption('Modelo de referencia: cumpleaños independientes y fechas equiprobables. En la opción de 365 días se excluyen del análisis observado los nacimientos del 29 de febrero.')
     st.write(f'**Resultado:** {groups} fecha(s) compartida(s), con {participants} participante(s) involucrado(s) en coincidencias. Probabilidad teórica para {n} cumpleaños analizados: **{probability:.2%}**.')
+    with st.expander('¿Cómo se calcula la probabilidad teórica?'):
+        st.latex(r'P(\text{al menos una coincidencia})=1-\prod_{k=0}^{n-1}\frac{D-k}{D}')
+        st.write(f'En esta actividad: **n = {n}** personas y **D = {366 if include_leap else 365}** fechas posibles. Primero se calcula la probabilidad de que todos tengan cumpleaños diferentes y después se resta de 1.')
+        st.caption('Supuestos: independencia y equiprobabilidad de fechas. Las fechas reales no son exactamente equiprobables.')
     if groups:
         st.dataframe(pd.DataFrame({'Día/mes':matches.index,'Número de respuestas':matches.values}),hide_index=True,use_container_width=True)
     else:
@@ -132,6 +240,16 @@ def render():
         empirical_rate=float(coincidence.mean())
         st.metric('Frecuencia de coincidencia en grupos simulados',f'{empirical_rate:.2%}')
         st.caption(f'La frecuencia simulada ({empirical_rate:.2%}) se aproxima a la probabilidad teórica ({probability:.2%}) al repetir el experimento. No debe confundirse con la única observación del salón.')
+    st.subheader('Estimaciones iniciales del grupo')
+    guesses = df['estimacion'].dropna().astype(str).str.strip()
+    if len(guesses):
+        guesses_freq = guesses.value_counts().rename_axis('Estimación').reset_index(name='Respuestas')
+        fig_guess = px.bar(guesses_freq,x='Estimación',y='Respuestas',text='Respuestas',title='Probabilidad estimada antes de conocer la respuesta')
+        fig_guess.update_layout(xaxis_title='Intervalo de probabilidad estimado',yaxis_title='Número de respuestas')
+        st.plotly_chart(fig_guess,use_container_width=True)
+        st.caption(f'La probabilidad teórica es {probability:.2%}. Las estimaciones son categorías de intervalo, por lo que no se les asigna artificialmente un valor puntual.')
+    else:
+        st.info('No hay estimaciones iniciales registradas.')
     st.subheader('3. Distribuciones de frecuencias y estadística descriptiva')
     selected = st.selectbox('Variable numérica',list(LABELS),format_func=lambda x: LABELS[x],key='mot_numeric')
     values = df[selected].dropna()
@@ -139,17 +257,19 @@ def render():
         st.warning('No hay respuestas numéricas válidas para esta variable.')
     else:
         bins = st.slider('Número de intervalos',3,15,6,key='mot_bins')
-        edges=np.linspace(float(values.min()),float(values.max()),bins+1) if values.max()!=values.min() else np.array([values.min()-.5,values.max()+.5])
-        cats=pd.cut(values,bins=edges,include_lowest=True,duplicates='drop')
-        counts=cats.value_counts(sort=False)
-        table=pd.DataFrame({'Intervalo':counts.index.astype(str),'f':counts.values})
-        table['fr']=table['f']/len(values)
-        table['%']=(table['fr']*100).round(2)
-        table['F acumulada']=table['f'].cumsum()
+        edges,mids,counts,table = frequency_table(values,bins)
         st.dataframe(table,hide_index=True,use_container_width=True)
-        st.plotly_chart(px.histogram(x=values,nbins=bins,labels={'x':LABELS[selected],'y':'Frecuencia'},title=f'Distribución: {LABELS[selected]}'),use_container_width=True)
+        st.caption('f = frecuencia absoluta; fr = frecuencia relativa; % = porcentaje; F acumulada = número de observaciones hasta ese intervalo; Fr acumulada = proporción acumulada. La suma de f debe ser igual al número de datos válidos.')
+        st.plotly_chart(frequency_figure(edges,mids,counts,LABELS[selected]),use_container_width=True)
+        st.caption('Interactúa con la figura: pasa el cursor para ver marcas de clase y frecuencias; usa la leyenda para ocultar el histograma o el polígono y las herramientas para ampliar o descargar la imagen. Las clases son cerradas a la izquierda y abiertas a la derecha, excepto la última.')
         stats=pd.DataFrame({'Medida':['n válido','Media','Mediana','Moda(s)','Mínimo','Máximo','Rango','Desviación estándar muestral','Varianza muestral','Q1','Q3'], 'Valor':[len(values),round(values.mean(),3),round(values.median(),3),', '.join(map(str,values.mode().head(5).tolist())),values.min(),values.max(),round(values.max()-values.min(),3),round(values.std(ddof=1),3) if len(values)>1 else None,round(values.var(ddof=1),3) if len(values)>1 else None,round(values.quantile(.25),3),round(values.quantile(.75),3)]})
         st.dataframe(stats,hide_index=True,use_container_width=True)
+    if not values.empty and n>=2:
+        try:
+            pdf=make_motivation_pdf(df,valid,matches,probability,empirical_rate,table,edges,mids,counts,selected,runs,int(seed))
+            st.download_button('Descargar informe de Motivación (PDF)',pdf,'LA-Lab_Motivacion_v0615.pdf','application/pdf',key='mot_pdf')
+        except Exception as exc:
+            st.warning(f'No se pudo generar el informe PDF: {exc}')
     st.subheader('4. Probabilidad empírica y condicional')
     valid_grades=df['promedio'].notna()
     event=df['promedio']>=8
