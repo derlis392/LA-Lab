@@ -152,6 +152,21 @@ def academic_birthday_formula(days):
     return result
 
 
+def academic_birthday_example():
+    """Desarrollo matemático breve con tipografía académica para el PDF."""
+    fig, ax = plt.subplots(figsize=(10.5, 0.8))
+    ax.axis('off')
+    eq = (r'$P(\mathrm{coincidencia};\,n=4) = 1 - '
+          r'\frac{365}{365}\cdot\frac{364}{365}\cdot'
+          r'\frac{363}{365}\cdot\frac{362}{365}$')
+    ax.text(0.5, 0.5, eq, ha='center', va='center', fontsize=19, color='#183153')
+    result = io.BytesIO()
+    fig.savefig(result, format='png', dpi=220, bbox_inches='tight', pad_inches=0.10)
+    plt.close(fig)
+    result.seek(0)
+    return result
+
+
 def make_motivation_pdf(df, valid, matches, probability, empirical_rate, table, edges, mids, counts, selected, sim_runs, seed, days=365, synthetic=False):
     """Informe autónomo sin Kaleido ni bibliotecas del sistema."""
     buf = io.BytesIO()
@@ -173,7 +188,7 @@ def make_motivation_pdf(df, valid, matches, probability, empirical_rate, table, 
     if logos:
         row=Table([logos],colWidths=[5.6*cm]*len(logos),hAlign='CENTER')
         story.append(row);story.append(Spacer(1,0.5*cm))
-    para('LA-Lab v0.6.17 | Motivación', 'Title')
+    para('LA-Lab v0.6.18 | Motivación', 'Title')
     para('Encuesta, paradoja del cumpleaños y estadística descriptiva', 'Heading2')
     para(('Reporte exploratorio con datos sintéticos: demostración, no estudiantes reales.' if synthetic else 'Reporte exploratorio con respuestas cargadas por el usuario.') + ' No permite inferir causalidad ni fundamentar decisiones individuales.')
     para('1. Paradoja del cumpleaños','Heading2')
@@ -187,6 +202,17 @@ def make_motivation_pdf(df, valid, matches, probability, empirical_rate, table, 
     para('Donde <b>n</b> es el número de personas y <b>D</b> es el número de fechas posibles '
          f'(<b>D = {days}</b> en este análisis). La expresión es válida para 0 ≤ n ≤ D; '
          'si n &gt; D, la coincidencia es segura. Se supone independencia y equiprobabilidad de los cumpleaños.')
+    para('<b>Significado del índice k.</b> En la productoria, <b>k</b> es un contador entero que toma los valores '
+         '0, 1, 2, ..., n - 1. Cada factor (D - k)/D representa la probabilidad de que la siguiente '
+         'persona tenga un cumpleaños diferente de los k cumpleaños anteriores, suponiendo que '
+         'las fechas previas son distintas. Por ello, k no es una probabilidad ni una constante.')
+    para('Ejemplo con cuatro personas y D = 365:', 'Heading3')
+    story.append(Image(academic_birthday_example(), width=14.7*cm, height=1.20*cm, hAlign='CENTER'))
+    story.append(Spacer(1, .15*cm))
+    para('Los factores corresponden, respectivamente, a k = 0, 1, 2 y 3. '
+         'Para un grupo de 60 personas, el índice recorre desde k = 0 hasta k = 59; '
+         'el último factor es 306/365. El producto calcula la probabilidad de ninguna coincidencia; '
+         'restarlo de 1 proporciona la probabilidad de al menos una coincidencia.')
     fig_birth=birthday_illustration(len(valid),days)
     birth_png=io.BytesIO();fig_birth.savefig(birth_png,format='png',dpi=145);plt.close(fig_birth);birth_png.seek(0)
     story.append(Image(birth_png,width=15.8*cm,height=5.6*cm));story.append(Spacer(1,.3*cm))
@@ -296,6 +322,16 @@ def render():
     st.write(birthday_explanation(n,days))
     st.latex(r'P(\text{al menos una coincidencia})=1-\prod_{k=0}^{n-1}\frac{D-k}{D}')
     st.caption(f'En este conjunto, n = {n} y D = {days}. Para n > D, la coincidencia es segura.')
+    st.markdown('**¿Qué significa k en la productoria?**')
+    st.write('**k** es un índice entero que comienza en **0** y aumenta de uno en uno hasta **n − 1**. '
+             'En el factor **(D − k)/D**, representa cuántas fechas de cumpleaños distintas '
+             'ya se han ocupado en los pasos anteriores, bajo la condición de que no hubo coincidencias. '
+             'No representa una probabilidad ni un número fijo de estudiantes.')
+    st.latex(r'P(\text{coincidencia};\ n=4)=1-\frac{365}{365}\cdot\frac{364}{365}\cdot\frac{363}{365}\cdot\frac{362}{365}')
+    st.caption('Ejemplo: para cuatro personas, k = 0, 1, 2 y 3. '
+               'Para 60 personas, k va de 0 a 59 y el último factor es 306/365. '
+               'Se calcula primero la probabilidad de ninguna coincidencia y luego se resta de 1.')
+
     st.pyplot(birthday_illustration(n,days),clear_figure=True)
     st.write(f'**Resultado:** {groups} fecha(s) compartida(s), con {participants} participante(s) involucrado(s) en coincidencias. Probabilidad teórica para {n} cumpleaños analizados: **{probability:.2%}**.')
     with st.expander('¿Cómo se calcula la probabilidad teórica?'):
@@ -346,7 +382,7 @@ def render():
     if not values.empty and n>=2:
         try:
             pdf=make_motivation_pdf(df,valid,matches,probability,empirical_rate,table,edges,mids,counts,selected,runs,int(seed),days,source.startswith('Ejemplo'))
-            st.download_button('Descargar informe de Motivación (PDF)',pdf,'LA-Lab_Motivacion_v0617.pdf','application/pdf',key='mot_pdf')
+            st.download_button('Descargar informe de Motivación (PDF)',pdf,'LA-Lab_Motivacion_v0618.pdf','application/pdf',key='mot_pdf')
         except Exception as exc:
             st.warning(f'No se pudo generar el informe PDF: {exc}')
     st.subheader('4. Probabilidad empírica y condicional')
