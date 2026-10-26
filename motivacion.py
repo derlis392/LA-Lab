@@ -137,6 +137,21 @@ def birthday_illustration(n, days):
     return fig
 
 
+def academic_birthday_formula(days):
+    """Fórmula matemática vectorial rasterizada a alta resolución para ReportLab."""
+    fig, ax = plt.subplots(figsize=(10.2, 1.35))
+    ax.axis('off')
+    equation = (r'$P(\mathrm{coincidencia}) = 1 - '
+                r'\prod_{k=0}^{n-1} \frac{D-k}{D}$')
+    ax.text(0.5, 0.53, equation, ha='center', va='center', fontsize=24, color='#183153')
+    fig.patch.set_facecolor('white')
+    result = io.BytesIO()
+    fig.savefig(result, format='png', dpi=220, bbox_inches='tight', pad_inches=0.12)
+    plt.close(fig)
+    result.seek(0)
+    return result
+
+
 def make_motivation_pdf(df, valid, matches, probability, empirical_rate, table, edges, mids, counts, selected, sim_runs, seed, days=365, synthetic=False):
     """Informe autónomo sin Kaleido ni bibliotecas del sistema."""
     buf = io.BytesIO()
@@ -158,14 +173,20 @@ def make_motivation_pdf(df, valid, matches, probability, empirical_rate, table, 
     if logos:
         row=Table([logos],colWidths=[5.6*cm]*len(logos),hAlign='CENTER')
         story.append(row);story.append(Spacer(1,0.5*cm))
-    para('LA-Lab v0.6.16 | Motivación', 'Title')
+    para('LA-Lab v0.6.17 | Motivación', 'Title')
     para('Encuesta, paradoja del cumpleaños y estadística descriptiva', 'Heading2')
     para(('Reporte exploratorio con datos sintéticos: demostración, no estudiantes reales.' if synthetic else 'Reporte exploratorio con respuestas cargadas por el usuario.') + ' No permite inferir causalidad ni fundamentar decisiones individuales.')
     para('1. Paradoja del cumpleaños','Heading2')
     para(f'Respuestas: {len(df)}. Cumpleaños válidos analizados: {len(valid)}. Fechas compartidas: {len(matches)}. Personas involucradas: {int(matches.sum())}.')
     para(f'Probabilidad teórica: {probability:.2%}. Simulación: {empirical_rate:.2%} en {sim_runs} grupos (semilla {seed}).')
     para(birthday_explanation(len(valid),days))
-    para('Fórmula: P(al menos una coincidencia) = 1 - [D! / ((D-n)! × D^n)], para n ≤ D, donde n es el número de personas y D el número de fechas posibles.')
+    para('Modelo matemático de la probabilidad de coincidencia:', 'Heading3')
+    formula_png = academic_birthday_formula(days)
+    story.append(Image(formula_png, width=14.8*cm, height=1.95*cm, hAlign='CENTER'))
+    story.append(Spacer(1, .12*cm))
+    para('Donde <b>n</b> es el número de personas y <b>D</b> es el número de fechas posibles '
+         f'(<b>D = {days}</b> en este análisis). La expresión es válida para 0 ≤ n ≤ D; '
+         'si n &gt; D, la coincidencia es segura. Se supone independencia y equiprobabilidad de los cumpleaños.')
     fig_birth=birthday_illustration(len(valid),days)
     birth_png=io.BytesIO();fig_birth.savefig(birth_png,format='png',dpi=145);plt.close(fig_birth);birth_png.seek(0)
     story.append(Image(birth_png,width=15.8*cm,height=5.6*cm));story.append(Spacer(1,.3*cm))
@@ -325,7 +346,7 @@ def render():
     if not values.empty and n>=2:
         try:
             pdf=make_motivation_pdf(df,valid,matches,probability,empirical_rate,table,edges,mids,counts,selected,runs,int(seed),days,source.startswith('Ejemplo'))
-            st.download_button('Descargar informe de Motivación (PDF)',pdf,'LA-Lab_Motivacion_v0616.pdf','application/pdf',key='mot_pdf')
+            st.download_button('Descargar informe de Motivación (PDF)',pdf,'LA-Lab_Motivacion_v0617.pdf','application/pdf',key='mot_pdf')
         except Exception as exc:
             st.warning(f'No se pudo generar el informe PDF: {exc}')
     st.subheader('4. Probabilidad empírica y condicional')

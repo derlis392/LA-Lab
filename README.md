@@ -98,5 +98,5 @@ Funciones: validación de día/mes, conteo de coincidencias, probabilidad teóri
 Para desplegar, sustituye el contenido completo del repositorio por este ZIP, conservando `motivacion.py` y `data/respuestas_sinteticas_60.xlsx`. La dependencia `streamlit` ya figura en `requirements.txt`. No se requiere CairoSVG.
 
 
-## v0.6.16 — Cierre de Motivación
+## v0.6.17 — Cierre de Motivación
 Explicación formal y fórmula del cumpleaños, figura de crecimiento probabilístico, tabla PDF con frecuencia relativa acumulada, gráfica de estimaciones previas y conclusión automática en aplicación y PDF.
